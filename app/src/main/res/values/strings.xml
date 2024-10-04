@@ -1,0 +1,21 @@
+<resources>
+    <string name="app_name">SpeechToImageApp</string>
+    <string name="navigation_drawer_open">Open navigation drawer</string>
+    <string name="navigation_drawer_close">close navigation drawer</string>
+
+    <string name="font">\@font/</string>
+    <string name="select_images">select_images</string>
+    <string name="rename_image">rename_image</string>
+    <string name="save">save</string>
+    <string name="delete_selected">delete_selected</string>
+    <string name="delete">delete</string>
+    <string name="image_desc">image_desc</string>
+    <string name="delete_desc">delete_desc</string>
+    <string name="upload_image">Upload Image</string>
+
+    <string-array name="word_modes">
+        <item>One Word</item>
+        <item>Two Words</item>
+        <item>Three Words</item>
+    </string-array>
+</resources>

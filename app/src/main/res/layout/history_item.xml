@@ -1,0 +1,25 @@
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <TextView
+        android:id="@+id/textViewSession"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Session data"
+        android:textSize="16sp"
+        android:layout_marginBottom="8dp"
+        android:textAlignment="viewStart"
+        android:lineSpacingExtra="4dp"
+        android:maxLines="1000"
+        android:ellipsize="none" />
+
+    <Button
+        android:id="@+id/buttonDeleteSession"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Delete" />
+</LinearLayout>

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="button_upload" type="id" />
+    <item name="button_delete" type="id" />
+    <item name="recyclerView_images" type="id" />
+</resources>
