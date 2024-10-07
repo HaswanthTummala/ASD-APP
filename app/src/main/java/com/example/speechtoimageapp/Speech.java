@@ -346,15 +346,19 @@ public class Speech extends AppCompatActivity {
     private void moveImageBasedOnMotion(RecordedMotion motion) {
         List<List<Float>> posList = motion.posList;
         long increment = motion.increment;
+        float degreesPerIncrement = motion.degreesPerIncrement;
+        AtomicInteger rotationCount = new AtomicInteger(0);
 
         Handler motionHandler = new Handler();
         motionHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 if (!posList.isEmpty()) {
+                    int rCount = rotationCount.incrementAndGet();
                     List<Float> pos = posList.remove(0);
                     imageView.setX(pos.get(0) - imageView.getWidth() / 2);
                     imageView.setY(pos.get(1) - imageView.getHeight() / 2);
+                    imageView.setRotation(rCount * degreesPerIncrement);
                     motionHandler.postDelayed(this, increment);
                 }
             }
