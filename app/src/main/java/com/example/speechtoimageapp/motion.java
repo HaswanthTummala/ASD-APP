@@ -54,11 +54,11 @@ public class motion extends AppCompatActivity implements OnAdapterItemClickListe
     // Variables for RecordedMotion objects
     HashMap<String, ArrayList<RecordedMotion>> motionList = new HashMap<>();
     List<List<Float>> posList;
+    List<Long> posIncrements;
     long startTime;
+    long incrementTime;
     long endTime;
-    long increment;
     // Flag that determines if motion is stationary
-    boolean stationaryFlag;
     boolean recordSentinel = false;
 
     // SharedPreferences constants
@@ -130,95 +130,90 @@ public class motion extends AppCompatActivity implements OnAdapterItemClickListe
 
             // Reset RecordedMotion variables
             posList = new ArrayList<>();
+            posIncrements = new ArrayList<>();
             startTime = 0;
             endTime = 0;
-            increment = 0;
-            stationaryFlag = true;
+            incrementTime = 0;
             recordSentinel = true;
         });
 
-        View.OnTouchListener touchListener = new View.OnTouchListener() {
-            @Override
-            public boolean onTouch(View view, MotionEvent event) {
-                if (!recordSentinel) {
-                    return false;
-                }
-                switch (event.getAction()) {
-                    case MotionEvent.ACTION_DOWN:
-                        Log.d("TAG", "Touch started");
-                        posList.add(List.of(event.getRawX(), event.getRawY()));
-                        startTime = System.currentTimeMillis();
-                        return true;
-                    case MotionEvent.ACTION_MOVE:
-                        posList.add(List.of(event.getRawX(), event.getRawY()));
-                        return true;
-                    case MotionEvent.ACTION_UP:
-                        posList.add(List.of(event.getRawX(), event.getRawY()));
-                        endTime = System.currentTimeMillis();
-                        increment = (endTime - startTime) / posList.size();
-
-                        // Create dialog to allow user to name new motion and set rotation
-                        AlertDialog.Builder motionDialogBuilder = new AlertDialog.Builder(motion.this);
-                        motionDialogBuilder.setTitle("Customize New Motion");
-                        final View dialogLayout = getLayoutInflater().inflate(R.layout.dialog_save_motion, null);
-                        motionDialogBuilder.setView(dialogLayout);
-                        motionDialogBuilder.setPositiveButton("Save", (dialogInterface, i) -> {
-                            // Save motion with name input
-                            EditText motionNameInput = dialogLayout.findViewById(R.id.motionNameInput);
-                            EditText rotationInput = dialogLayout.findViewById(R.id.rotationInput);
-                            String nInput = motionNameInput.getText().toString();
-                            float rInput;
-                            try {
-                                rInput = Float.parseFloat(rotationInput.getText().toString());
-                            } catch (Exception e) {
-                                rInput = 0;
-                            }
-                            // If motion name input is not empty, process as usual. If it is, show error Toast to user.
-                            if (!nInput.isEmpty()) {
-                                // Create new RecordedMotion object
-                                RecordedMotion newMotion;
-                                // Determine if motion is stationary or not
-                                for (int j = 1; j < posList.size(); j++) {
-                                    // Check if any recorded coordinate is sufficiently far enough from the motion's starting point.
-                                    // If true, it is not stationary.
-                                    if (posList.get(0).get(0) - posList.get(j).get(0) < -10 || posList.get(0).get(0) - posList.get(j).get(0) > +10 || posList.get(0).get(1) - posList.get(j).get(1) < -10 || posList.get(0).get(1) - posList.get(j).get(1) > +10) {
-                                        stationaryFlag = false;
-                                        break;
-                                    }
-                                }
-                                // If the user specified a rotation value, create the newMotion with that value. Otherwise, default to 0.
-                                if (!isNaN(rInput) && rInput != 0) {
-                                    newMotion = new RecordedMotion(posList, increment, nInput, rInput, stationaryFlag);
-                                } else {
-                                    newMotion = new RecordedMotion(posList, increment, nInput, 0, stationaryFlag);
-                                }
-                                // If no RecordedMotions of this name exists, create a new blank entry.
-                                if (!motionList.containsKey(nInput)) {
-                                    motionList.put(nInput, new ArrayList<>());
-                                }
-                                // Add new RecordedMotion to relevant entry.
-                                ArrayList<RecordedMotion> tList = motionList.get(nInput);
-                                tList.add(newMotion);
-                                motionList.replace(nInput, tList);
-                                saveMotions(motionList);
-                            } else {
-                                Toast.makeText(motion.this, "No motion name given. Please try again.", Toast.LENGTH_SHORT).show();
-                            }
-                        });
-                        motionDialogBuilder.setNegativeButton("Cancel", (dialogInterface, i) -> { // Do nothing
-                        });
-                        AlertDialog motionDialog = motionDialogBuilder.create();
-
-                        motionDialog.show();
-                        startRecordButton.setVisibility(View.VISIBLE);
-                        recyclerViewLabel.setVisibility(View.VISIBLE);
-                        recyclerView.setVisibility(View.VISIBLE);
-                        touchView.setVisibility(View.GONE);
-                        recordSentinel = false;
-                        return true;
-                }
+        View.OnTouchListener touchListener = (view, event) -> {
+            if (!recordSentinel) {
                 return false;
             }
+            switch (event.getAction()) {
+                case MotionEvent.ACTION_DOWN:
+                    posList.add(List.of(event.getRawX(), event.getRawY()));
+                    startTime = System.currentTimeMillis();
+                    incrementTime = startTime;
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    posList.add(List.of(event.getRawX(), event.getRawY()));
+                    posIncrements.add(System.currentTimeMillis() - incrementTime);
+                    incrementTime = System.currentTimeMillis();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                    posList.add(List.of(event.getRawX(), event.getRawY()));
+                    endTime = System.currentTimeMillis() + 100;
+                    posIncrements.add(System.currentTimeMillis() - incrementTime);
+                    posIncrements.add(100L);
+
+                    for(long increments : posIncrements) {
+                        Log.d("MOVEMENT", String.valueOf(increments));
+                    }
+
+                    // Create dialog to allow user to name new motion and set rotation
+                    AlertDialog.Builder motionDialogBuilder = new AlertDialog.Builder(motion.this);
+                    motionDialogBuilder.setTitle("Customize New Motion");
+                    final View dialogLayout = getLayoutInflater().inflate(R.layout.dialog_save_motion, null);
+                    motionDialogBuilder.setView(dialogLayout);
+                    motionDialogBuilder.setPositiveButton("Save", (dialogInterface, i) -> {
+                        // Save motion with name input
+                        EditText motionNameInput = dialogLayout.findViewById(R.id.motionNameInput);
+                        EditText rotationInput = dialogLayout.findViewById(R.id.rotationInput);
+                        String nInput = motionNameInput.getText().toString();
+                        float rInput;
+                        try {
+                            rInput = Float.parseFloat(rotationInput.getText().toString());
+                        } catch (Exception e) {
+                            rInput = 0;
+                        }
+                        // If motion name input is not empty, process as usual. If it is, show error Toast to user.
+                        if (!nInput.isEmpty()) {
+                            // Create new RecordedMotion object
+                            RecordedMotion newMotion;
+                            // If the user specified a rotation value, create the newMotion with that value. Otherwise, default to 0.
+                            if (!isNaN(rInput) && rInput != 0) {
+                                newMotion = new RecordedMotion(posList, posIncrements, endTime - startTime, nInput, rInput);
+                            } else {
+                                newMotion = new RecordedMotion(posList, posIncrements, endTime - startTime, nInput, 0);
+                            }
+                            // If no RecordedMotions of this name exists, create a new blank entry.
+                            if (!motionList.containsKey(nInput)) {
+                                motionList.put(nInput, new ArrayList<>());
+                            }
+                            // Add new RecordedMotion to relevant entry.
+                            ArrayList<RecordedMotion> tList = motionList.get(nInput);
+                            tList.add(newMotion);
+                            motionList.replace(nInput, tList);
+                            saveMotions(motionList);
+                        } else {
+                            Toast.makeText(motion.this, "No motion name given. Please try again.", Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                    motionDialogBuilder.setNegativeButton("Cancel", (dialogInterface, i) -> { // Do nothing
+                    });
+                    AlertDialog motionDialog = motionDialogBuilder.create();
+
+                    motionDialog.show();
+                    startRecordButton.setVisibility(View.VISIBLE);
+                    recyclerViewLabel.setVisibility(View.VISIBLE);
+                    recyclerView.setVisibility(View.VISIBLE);
+                    touchView.setVisibility(View.GONE);
+                    recordSentinel = false;
+                    return true;
+            }
+            return false;
         };
 
         touchView.setOnTouchListener(touchListener);
