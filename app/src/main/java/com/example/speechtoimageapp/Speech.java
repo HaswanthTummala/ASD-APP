@@ -160,6 +160,13 @@ public class Speech extends AppCompatActivity {
         });
     }
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        speechRecognizer.cancel();
+        speechRecognizer.destroy();
+    }
+
     private String getCurrentTimestamp() {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
     }
