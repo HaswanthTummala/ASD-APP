@@ -11,10 +11,12 @@ import android.graphics.Color;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
+import android.os.HandlerThread;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -40,6 +42,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class Speech extends AppCompatActivity {
 
@@ -345,24 +349,51 @@ public class Speech extends AppCompatActivity {
 
     private void moveImageBasedOnMotion(RecordedMotion motion) {
         List<List<Float>> posList = motion.posList;
-        long increment = motion.increment;
-        float degreesPerIncrement = motion.degreesPerIncrement;
-        AtomicInteger rotationCount = new AtomicInteger(0);
+        List<Long> posIncrements = motion.posIncrements;
+        imageView.setRotation(0);
 
-        Handler motionHandler = new Handler();
+        // Create a thread each for motion and rotation, so they can run concurrently
+        HandlerThread motionThread = new HandlerThread("MotionHandlerThread");
+        motionThread.start();
+        Handler motionHandler = new Handler(motionThread.getLooper());
         motionHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 if (!posList.isEmpty()) {
-                    int rCount = rotationCount.incrementAndGet();
+                    // Get and remove next position
                     List<Float> pos = posList.remove(0);
+                    // Get and remove current position duration
+                    long currentIncrement = posIncrements.remove(0);
+                    // Set image's position to next position
                     imageView.setX(pos.get(0) - imageView.getWidth() / 2);
                     imageView.setY(pos.get(1) - imageView.getHeight() / 2);
-                    imageView.setRotation(rCount * degreesPerIncrement);
-                    motionHandler.postDelayed(this, increment);
+                    // Repeat until posList is empty
+                    motionHandler.postDelayed(this, currentIncrement);
+                } else {
+                    motionThread.quit();
                 }
             }
-        }, increment);
+        }, posIncrements.get(0));
+
+        long durationPerIncrement = motion.duration / 500;
+        float degreesPerIncrement = ((((float) motion.duration / 1000) * motion.rotationsPerSecond) / 500) * 360;
+        AtomicInteger rotationCount = new AtomicInteger(0);
+
+        HandlerThread rotationThread = new HandlerThread("RotationHandlerThread");
+        rotationThread.start();
+        Handler rotationHandler = new Handler(rotationThread.getLooper());
+        rotationHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                int count = rotationCount.getAndIncrement();
+                imageView.setRotation(count * degreesPerIncrement);
+                if (rotationCount.get() < 500) {
+                    motionHandler.postDelayed(this, durationPerIncrement);
+                } else {
+                    rotationThread.quit();
+                }
+            }
+        }, durationPerIncrement);
     }
 
     private Bitmap loadSVGAsBitmap(File svgFile) {
