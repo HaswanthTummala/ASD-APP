@@ -313,7 +313,7 @@ public class Speech extends AppCompatActivity {
 
         if (bitmap != null) {
             // Apply color only to the object, skipping transparent pixels (background)
-            if (color != null && !color.isEmpty() && adjectiveMap.containsValue(color)) {
+            if (color != null && !color.isEmpty() && !adjectiveMap.containsKey(color) ) {
                 int selectedColor = colorMap.get(color);
                 bitmap = applySelectiveColorToObject(bitmap, selectedColor);  // Apply color to object only
             }
@@ -564,27 +564,45 @@ public class Speech extends AppCompatActivity {
     private Bitmap overlayPatternOnImage(String pattern, Bitmap bitmap) {
         //Bitmap bitmap = loadSVGAsBitmap(imageFileSVG);
         if (bitmap != null) {
+            // Create a mutable copy of the original bitmap to apply changes
             Bitmap mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
             Canvas canvas = new Canvas(mutableBitmap);
             Paint paint = new Paint();
             paint.setColor(Color.BLACK);  // Color for the pattern
             paint.setStyle(Paint.Style.STROKE);
-            paint.setStrokeWidth(10);
+            paint.setStrokeWidth(5);  // Adjust stroke width for patterns
 
-            // Draw the pattern based on the type
+            // Determine the pattern to draw
             switch (pattern) {
                 case "stripped":
-                    // Draw horizontal stripes
-                    for (int y = 0; y < mutableBitmap.getHeight(); y += 40) {
-                        canvas.drawLine(0, y, mutableBitmap.getWidth(), y, paint);
+                    // Draw horizontal stripes on the object only (skip transparent pixels)
+                    for (int y = 0; y < mutableBitmap.getHeight(); y += 30) {  // Change `30` to adjust stripe spacing
+                        // Check for the object boundaries on this row
+                        int startX = -1;
+                        int endX = -1;
+                        for (int x = 0; x < mutableBitmap.getWidth(); x++) {
+                            int pixel = mutableBitmap.getPixel(x, y);
+                            if (Color.alpha(pixel) != 0) {
+                                if (startX == -1) startX = x;  // Mark the start of the object
+                                endX = x;  // Continuously update endX to mark the end of the object
+                            }
+                        }
+
+                        // Draw the stripe line only within the object boundaries
+                        if (startX != -1 && endX != -1) {
+                            canvas.drawLine(startX, y, endX, y, paint);
+                        }
                     }
                     break;
 
                 case "dotted":
-                    // Draw dotted pattern
-                    for (int x = 0; x < mutableBitmap.getWidth(); x += 40) {
-                        for (int y = 0; y < mutableBitmap.getHeight(); y += 40) {
-                            canvas.drawCircle(x, y, 10, paint);
+                    // Draw dotted pattern on the object only (skip transparent pixels)
+                    for (int x = 0; x < mutableBitmap.getWidth(); x += 30) {
+                        for (int y = 0; y < mutableBitmap.getHeight(); y += 30) {
+                            // Check if the pixel is not transparent
+                            if (Color.alpha(mutableBitmap.getPixel(x, y)) != 0) {
+                                canvas.drawCircle(x, y, 5, paint);  // Draw a small dot
+                            }
                         }
                     }
                     break;
@@ -592,7 +610,7 @@ public class Speech extends AppCompatActivity {
 
             return mutableBitmap;  // Return the modified bitmap
         }
-        return null;
+        return null;  //
     }
 
     public void muteAudio() {
