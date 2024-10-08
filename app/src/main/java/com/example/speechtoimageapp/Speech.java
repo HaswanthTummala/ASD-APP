@@ -67,8 +67,11 @@ public class Speech extends AppCompatActivity {
     private String currentColor = "";
     private String currentMotion = "";
     private String currentObject = "";
+    private String currentAdjective = "";
 
     private int wordLimit = 1;  // Default to one word
+    private HashMap<String, String> adjectiveMap = new HashMap<>();
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -81,6 +84,7 @@ public class Speech extends AppCompatActivity {
 
         // Initialize color and motion mappings
         initializeColorMap();
+        initializeAdjectiveMap();
         motionMap = readMotions();
 
         // Request microphone permission
@@ -199,6 +203,12 @@ public class Speech extends AppCompatActivity {
                 recognized = true;
             }
 
+            if (adjectiveMap.containsKey(word)) {
+                currentAdjective = word;
+                handleAdjective(word);  // New function to handle adjective
+                recognized = true;
+            }
+
             // Detect object (like "sun", "house")
             if (new File(imageFolder, word + ".png").exists() || new File(imageFolder, word + ".svg").exists()) {
                 //currentObject = word;
@@ -214,6 +224,7 @@ public class Speech extends AppCompatActivity {
                 // Build the phrase: color, motion, object
                 StringBuilder phrase = new StringBuilder();
                 if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
+                if (!currentAdjective.isEmpty()) phrase.append(currentAdjective).append(" ");
                 if (!currentMotion.isEmpty()) phrase.append(currentMotion).append(" ");
                 phrase.append(word);
 
@@ -435,6 +446,21 @@ public class Speech extends AppCompatActivity {
         colorMap.put("pink", Color.rgb(255, 192, 203));
     }
 
+    private void initializeAdjectiveMap() {
+        // Map to handle size adjectives
+        adjectiveMap.put("big", "size");
+        adjectiveMap.put("small", "size");
+
+        // Map to handle pattern adjectives
+        adjectiveMap.put("striped", "pattern");
+        adjectiveMap.put("dotted", "pattern");
+
+        // Map to handle texture adjectives
+        adjectiveMap.put("furry", "texture");
+        adjectiveMap.put("smooth", "texture");
+    }
+
+
     private HashMap<String, ArrayList<RecordedMotion>> readMotions() {
         try (ObjectInputStream objectInputStream = new ObjectInputStream(openFileInput("motionData.bin"))) {
             return (HashMap<String, ArrayList<RecordedMotion>>) objectInputStream.readObject();
@@ -443,6 +469,53 @@ public class Speech extends AppCompatActivity {
             return null;
         }
     }
+
+    private void handleAdjective(String adjective) {
+        String type = adjectiveMap.get(adjective);
+
+        switch (type) {
+            case "size":
+                if (adjective.equals("big")) {
+                    imageView.setScaleX(2.5f);
+                    imageView.setScaleY(2.5f);
+                } else if (adjective.equals("small")) {
+                    imageView.setScaleX(0.25f);
+                    imageView.setScaleY(0.25f);
+                }
+                break;
+
+            case "pattern":
+                // Apply pattern overlay transformations here
+                // e.g., striped or dotted patterns
+                if (adjective.equals("striped")) {
+                    // Implement logic to overlay striped pattern on the image
+                    overlayPatternOnImage("striped");
+                } else if (adjective.equals("dotted")) {
+                    // Implement logic to overlay dotted pattern on the image
+                    overlayPatternOnImage("dotted");
+                }
+                break;
+
+            case "texture":
+                // Apply texture transformations here
+                if (adjective.equals("furry")) {
+                    addTextureEffect("furry");
+                } else if (adjective.equals("smooth")) {
+                    addTextureEffect("smooth");
+                }
+                break;
+        }
+    }
+
+
+    private void addTextureEffect(String texture) {
+
+    }
+
+
+    private void overlayPatternOnImage(String pattern) {
+
+            }
 
     public void muteAudio() {
         AudioManager audMan = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
