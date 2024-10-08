@@ -473,6 +473,9 @@ public class Speech extends AppCompatActivity {
         // Map to handle texture adjectives
         adjectiveMap.put("furry", "texture");
         adjectiveMap.put("smooth", "texture");
+
+        adjectiveMap.put("transparent", "opacity");
+        adjectiveMap.put("opaque", "opacity");
     }
 
 
@@ -518,6 +521,13 @@ public class Speech extends AppCompatActivity {
                    return addTextureEffect("furry", bitmap);
                 } else if (adjective.equals("smooth")) {
                     return addTextureEffect("smooth", bitmap);
+                }
+                break;
+            case "opacity":  // Handle opacity changes
+                if (adjective.equals("transparent")) {
+                    return changeImageOpacity(bitmap, 0.1f);  // 30% visible
+                } else if (adjective.equals("opaque")) {
+                    return changeImageOpacity(bitmap, 1.0f);  // Fully visible
                 }
                 break;
         }
@@ -612,6 +622,24 @@ public class Speech extends AppCompatActivity {
         }
         return null;  //
     }
+
+    private Bitmap changeImageOpacity(Bitmap bitmap, float opacity) {
+        Bitmap mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+
+        // Create a temporary bitmap with the same dimensions and apply opacity using a separate Canvas
+        Bitmap tempBitmap = Bitmap.createBitmap(mutableBitmap.getWidth(), mutableBitmap.getHeight(), Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(tempBitmap);
+        Paint paint = new Paint();
+
+        // Set the opacity value (0.0 to 1.0) and apply it to the paint object
+        paint.setAlpha((int) (opacity * 255));  // Alpha value (0-255)
+
+        // Draw the bitmap onto the new canvas with the specified opacity
+        canvas.drawBitmap(mutableBitmap, 0, 0, paint);
+
+        return tempBitmap;
+    }
+
 
     public void muteAudio() {
         AudioManager audMan = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
