@@ -252,7 +252,7 @@ public class Speech extends AppCompatActivity {
     }
     private List<File> getMatchingImagesForNoun(String noun) {
         // Use a FileFilter with a lambda expression to filter files
-        File[] files = imageFolder.listFiles(file -> file.getName().toLowerCase().contains(noun.toLowerCase()) && (file.getName().endsWith(".png") || file.getName().endsWith(".svg")));
+        File[] files = imageFolder.listFiles(file -> file.getName().toLowerCase().startsWith(noun.toLowerCase()) && (file.getName().endsWith(".png") || file.getName().endsWith(".svg")));
 
         // Convert the array to a list and return it
         return files != null ? Arrays.asList(files) : new ArrayList<>();
