@@ -215,7 +215,7 @@ public class Speech extends AppCompatActivity {
                 StringBuilder phrase = new StringBuilder();
                 if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
                 if (!currentMotion.isEmpty()) phrase.append(currentMotion).append(" ");
-                phrase.append(currentObject);
+                phrase.append(word);
 
                 // Add phrase to spokenWords for display
                 if (spokenWords.length() > 0) {
