@@ -7,7 +7,9 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Paint;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -16,7 +18,6 @@ import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
 
-import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -43,7 +44,6 @@ import java.util.Locale;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicLong;
 
 public class Speech extends AppCompatActivity {
 
@@ -204,8 +204,8 @@ public class Speech extends AppCompatActivity {
             }
 
             if (adjectiveMap.containsKey(word)) {
-                currentAdjective = word;
-                handleAdjective(word);  // New function to handle adjective
+                currentColor = word;
+                 // New function to handle adjective
                 recognized = true;
             }
 
@@ -224,7 +224,7 @@ public class Speech extends AppCompatActivity {
                 // Build the phrase: color, motion, object
                 StringBuilder phrase = new StringBuilder();
                 if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
-                if (!currentAdjective.isEmpty()) phrase.append(currentAdjective).append(" ");
+                //if (!currentAdjective.isEmpty()) phrase.append(currentAdjective).append(" ");
                 if (!currentMotion.isEmpty()) phrase.append(currentMotion).append(" ");
                 phrase.append(word);
 
@@ -234,12 +234,15 @@ public class Speech extends AppCompatActivity {
                 }
                 spokenWords.append(phrase);
 
+               // handleAdjective(currentAdjective, currentObject);
                 // Apply the color and motion to the image
                 loadImageAndApplyProperties(currentObject, currentColor, currentMotion, rand);
+
 
                 // Reset color and motion for the next phrase
                 currentColor = "";
                 currentMotion = "";
+                currentAdjective = "";
                 continue;
             }
 
@@ -310,9 +313,13 @@ public class Speech extends AppCompatActivity {
 
         if (bitmap != null) {
             // Apply color only to the object, skipping transparent pixels (background)
-            if (color != null && !color.isEmpty()) {
+            if (color != null && !color.isEmpty() && adjectiveMap.containsValue(color)) {
                 int selectedColor = colorMap.get(color);
                 bitmap = applySelectiveColorToObject(bitmap, selectedColor);  // Apply color to object only
+            }
+
+            if(color != null && adjectiveMap.containsKey(color)) {
+                bitmap = handleAdjective(bitmap, color);
             }
 
             imageView.setImageBitmap(bitmap);
@@ -326,8 +333,16 @@ public class Speech extends AppCompatActivity {
                 imageView.setTranslationY(0);
             }
             handler.removeCallbacksAndMessages(null); // Clear currently processing handler callbacks
-            handler.postDelayed(() -> imageView.setImageResource(0), 5000);  // Clear image after 5 seconds
+            handler.postDelayed(() -> {
+                imageView.setImageResource(0);  // Clear image after 5 seconds
+                resetImageViewScale();  // Reset scaling after clearing the image
+            }, 5000);
         }
+    }
+
+    private void resetImageViewScale() {
+        imageView.setScaleX(1.0f);  // Reset horizontal scale to default
+        imageView.setScaleY(1.0f);  // Reset vertical scale to default
     }
 
     // Apply color only to the object, ignoring transparent pixels (background)
@@ -452,7 +467,7 @@ public class Speech extends AppCompatActivity {
         adjectiveMap.put("small", "size");
 
         // Map to handle pattern adjectives
-        adjectiveMap.put("striped", "pattern");
+        adjectiveMap.put("stripped", "pattern");
         adjectiveMap.put("dotted", "pattern");
 
         // Map to handle texture adjectives
@@ -470,8 +485,9 @@ public class Speech extends AppCompatActivity {
         }
     }
 
-    private void handleAdjective(String adjective) {
+    private Bitmap handleAdjective(Bitmap bitmap, String adjective) {
         String type = adjectiveMap.get(adjective);
+
 
         switch (type) {
             case "size":
@@ -487,35 +503,97 @@ public class Speech extends AppCompatActivity {
             case "pattern":
                 // Apply pattern overlay transformations here
                 // e.g., striped or dotted patterns
-                if (adjective.equals("striped")) {
+                if (adjective.equals("stripped")) {
                     // Implement logic to overlay striped pattern on the image
-                    overlayPatternOnImage("striped");
+                     return overlayPatternOnImage("stripped", bitmap);
                 } else if (adjective.equals("dotted")) {
                     // Implement logic to overlay dotted pattern on the image
-                    overlayPatternOnImage("dotted");
+                     return overlayPatternOnImage("dotted", bitmap);
                 }
                 break;
 
             case "texture":
                 // Apply texture transformations here
                 if (adjective.equals("furry")) {
-                    addTextureEffect("furry");
+                   return addTextureEffect("furry", bitmap);
                 } else if (adjective.equals("smooth")) {
-                    addTextureEffect("smooth");
+                    return addTextureEffect("smooth", bitmap);
                 }
                 break;
         }
+        return bitmap;
     }
 
 
-    private void addTextureEffect(String texture) {
+    private Bitmap addTextureEffect(String texture, Bitmap bitmap) {
 
-    }
+        if (bitmap != null) {
+            Bitmap mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+            Canvas canvas = new Canvas(mutableBitmap);
+            Paint paint = new Paint();
 
+            switch (texture) {
+                case "furry":
+                    // Draw furry texture effect using random lines
+                    paint.setColor(Color.GRAY);
+                    paint.setStrokeWidth(2);
+                    for (int i = 0; i < 1000; i++) {
+                        int startX = random.nextInt(mutableBitmap.getWidth());
+                        int startY = random.nextInt(mutableBitmap.getHeight());
+                        int endX = startX + random.nextInt(20) - 10;
+                        int endY = startY + random.nextInt(20) - 10;
+                        canvas.drawLine(startX, startY, endX, endY, paint);
+                    }
+                    break;
 
-    private void overlayPatternOnImage(String pattern) {
-
+                case "smooth":
+                    // Draw smooth texture using a blur effect
+                    paint.setColor(Color.WHITE);
+                    paint.setAlpha(30);
+                    canvas.drawRect(0, 0, mutableBitmap.getWidth(), mutableBitmap.getHeight(), paint);
+                    break;
             }
+
+            return mutableBitmap;  // Return the modified bitmap
+        }
+        return null;
+
+    }
+
+
+    private Bitmap overlayPatternOnImage(String pattern, Bitmap bitmap) {
+        //Bitmap bitmap = loadSVGAsBitmap(imageFileSVG);
+        if (bitmap != null) {
+            Bitmap mutableBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+            Canvas canvas = new Canvas(mutableBitmap);
+            Paint paint = new Paint();
+            paint.setColor(Color.BLACK);  // Color for the pattern
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeWidth(10);
+
+            // Draw the pattern based on the type
+            switch (pattern) {
+                case "stripped":
+                    // Draw horizontal stripes
+                    for (int y = 0; y < mutableBitmap.getHeight(); y += 40) {
+                        canvas.drawLine(0, y, mutableBitmap.getWidth(), y, paint);
+                    }
+                    break;
+
+                case "dotted":
+                    // Draw dotted pattern
+                    for (int x = 0; x < mutableBitmap.getWidth(); x += 40) {
+                        for (int y = 0; y < mutableBitmap.getHeight(); y += 40) {
+                            canvas.drawCircle(x, y, 10, paint);
+                        }
+                    }
+                    break;
+            }
+
+            return mutableBitmap;  // Return the modified bitmap
+        }
+        return null;
+    }
 
     public void muteAudio() {
         AudioManager audMan = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
