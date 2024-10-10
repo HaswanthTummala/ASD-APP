@@ -473,6 +473,9 @@ public class Speech extends AppCompatActivity {
         adjectiveMap.put("wide", "size");
         adjectiveMap.put("narrow", "size");
 
+        adjectiveMap.put("bright", "light");
+        adjectiveMap.put("dark", "light");
+
         // Map to handle pattern adjectives
         adjectiveMap.put("stripped", "pattern");
         adjectiveMap.put("dotted", "pattern");
@@ -535,6 +538,15 @@ public class Speech extends AppCompatActivity {
                 }
                 break;
 
+            case "light":
+                if(adjective.equals("dark")) {
+                    return applyBrightnessEffect(bitmap, 0.25f);
+                }
+                else if(adjective.equals("bright")) {
+                    return applyBrightnessEffect(bitmap, 2.0f);
+                }
+                break;
+
             case "texture":
                 // Apply texture transformations here
                 if (adjective.equals("furry")) {
@@ -565,6 +577,36 @@ public class Speech extends AppCompatActivity {
 
         }
         return bitmap;
+    }
+
+    private Bitmap applyBrightnessEffect(Bitmap bitmap, float brightnessFactor) {
+        if (bitmap != null) {
+            // Create a mutable copy of the original bitmap to apply changes
+            Bitmap brightnessAdjustedBitmap = bitmap.copy(Bitmap.Config.ARGB_8888, true);
+
+            for (int x = 0; x < brightnessAdjustedBitmap.getWidth(); x++) {
+                for (int y = 0; y < brightnessAdjustedBitmap.getHeight(); y++) {
+                    int pixel = brightnessAdjustedBitmap.getPixel(x, y);
+
+                    // Get the current RGB values
+                    int r = Color.red(pixel);
+                    int g = Color.green(pixel);
+                    int b = Color.blue(pixel);
+                    int alpha = Color.alpha(pixel);  // Preserve alpha channel
+
+                    // Apply brightness factor (for "bright", brightnessFactor > 1; for "dark", brightnessFactor < 1)
+                    r = Math.min(255, (int) (r * brightnessFactor));
+                    g = Math.min(255, (int) (g * brightnessFactor));
+                    b = Math.min(255, (int) (b * brightnessFactor));
+
+                    // Set the new pixel color with the modified brightness values
+                    brightnessAdjustedBitmap.setPixel(x, y, Color.argb(alpha, r, g, b));
+                }
+            }
+
+            return brightnessAdjustedBitmap;  // Return the modified bitmap with brightness effect applied
+        }
+        return null;  // Return null if the bitmap is not valid
     }
 
 
