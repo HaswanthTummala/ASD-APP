@@ -7,9 +7,13 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Shader;
+import android.graphics.drawable.BitmapDrawable;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -466,6 +470,9 @@ public class Speech extends AppCompatActivity {
         adjectiveMap.put("big", "size");
         adjectiveMap.put("small", "size");
 
+        adjectiveMap.put("wide", "size");
+        adjectiveMap.put("narrow", "size");
+
         // Map to handle pattern adjectives
         adjectiveMap.put("stripped", "pattern");
         adjectiveMap.put("dotted", "pattern");
@@ -476,6 +483,8 @@ public class Speech extends AppCompatActivity {
 
         adjectiveMap.put("transparent", "opacity");
         adjectiveMap.put("opaque", "opacity");
+
+        adjectiveMap.put("shiny","shiny");
     }
 
 
@@ -495,11 +504,22 @@ public class Speech extends AppCompatActivity {
         switch (type) {
             case "size":
                 if (adjective.equals("big")) {
-                    imageView.setScaleX(2.5f);
-                    imageView.setScaleY(2.5f);
+                    imageView.setScaleX(2.0f);
+                    imageView.setScaleY(2.0f);
                 } else if (adjective.equals("small")) {
                     imageView.setScaleX(0.25f);
                     imageView.setScaleY(0.25f);
+                }
+            else if(adjective.equals("wide")) {
+                    // Increase the horizontal scale of the ImageView to make it wider
+                    imageView.setScaleX(2.0f);  // Make the image 1.5 times wider
+                    imageView.setScaleY(0.5f);  // Keep the height the same
+                }
+
+            else if(adjective.equals("narrow")) {
+                    // Decrease the horizontal scale of the ImageView to make it narrower
+                    imageView.setScaleX(0.5f);  // Make the image half as wide
+                    imageView.setScaleY(2.0f);  // Keep the height the same
                 }
                 break;
 
@@ -530,6 +550,19 @@ public class Speech extends AppCompatActivity {
                     return changeImageOpacity(bitmap, 1.0f);  // Fully visible
                 }
                 break;
+
+            case "wide":
+                // Increase the horizontal scale of the ImageView to make it wider
+                imageView.setScaleX(1.5f);  // Make the image 1.5 times wider
+                imageView.setScaleY(1.0f);  // Keep the height the same
+                break;
+
+            case "narrow":
+                // Decrease the horizontal scale of the ImageView to make it narrower
+                imageView.setScaleX(0.5f);  // Make the image half as wide
+                imageView.setScaleY(1.0f);  // Keep the height the same
+                break;
+
         }
         return bitmap;
     }
@@ -558,9 +591,6 @@ public class Speech extends AppCompatActivity {
 
                 case "smooth":
                     // Draw smooth texture using a blur effect
-                    paint.setColor(Color.WHITE);
-                    paint.setAlpha(30);
-                    canvas.drawRect(0, 0, mutableBitmap.getWidth(), mutableBitmap.getHeight(), paint);
                     break;
             }
 
