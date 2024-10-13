@@ -406,26 +406,43 @@ public class Speech extends AppCompatActivity {
         }, posIncrements.get(0));
 
         long durationPerIncrement = motion.duration / 500;
-        float degreesPerIncrement = ((((float) motion.duration / 1000) * motion.rotationsPerSecond) / 500) * 360;
-        AtomicInteger rotationCount = new AtomicInteger(0);
-
         HandlerThread rotationThread = new HandlerThread("RotationHandlerThread");
         rotationThread.start();
         Handler rotationHandler = new Handler(rotationThread.getLooper());
-        rotationHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                int count = rotationCount.getAndIncrement();
-                imageView.setRotation(count * degreesPerIncrement);
-                if (rotationCount.get() < 500) {
-                    motionHandler.postDelayed(this, durationPerIncrement);
-                } else {
-                    rotationThread.quit();
-                }
-            }
-        }, durationPerIncrement);
-    }
 
+        if (motion.rotFlag) {
+            AtomicInteger rotationCount = new AtomicInteger(motion.angleList.size());
+
+            rotationHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    rotationCount.getAndDecrement();
+                    imageView.setRotation(motion.angleList.remove(0));
+                    if (rotationCount.get() > 0) {
+                        rotationHandler.postDelayed(this, durationPerIncrement);
+                    } else {
+                        rotationThread.quit();
+                    }
+                }
+            }, durationPerIncrement);
+        } else {
+            float degreesPerIncrement = ((((float) motion.duration / 1000) * motion.rotationsPerSecond) / 500) * 360;
+            AtomicInteger rotationCount = new AtomicInteger(0);
+
+            rotationHandler.postDelayed(new Runnable() {
+                @Override
+                public void run() {
+                    int count = rotationCount.getAndIncrement();
+                    imageView.setRotation(count * degreesPerIncrement);
+                    if (rotationCount.get() < 500) {
+                        motionHandler.postDelayed(this, durationPerIncrement);
+                    } else {
+                        rotationThread.quit();
+                    }
+                }
+            }, durationPerIncrement);
+        }
+    }
     private Bitmap loadSVGAsBitmap(File svgFile) {
         try {
             FileInputStream fileInputStream = new FileInputStream(svgFile);
