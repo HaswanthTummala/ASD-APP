@@ -67,7 +67,6 @@ public class motion extends AppCompatActivity implements OnAdapterItemClickListe
     long startTime;
     long incrementTime;
     long endTime;
-    // Flag that determines if motion is stationary
     boolean recordSentinel = false;
     // Flag that handles rotation customization
     boolean rotationFlag = false;
