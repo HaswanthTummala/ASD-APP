@@ -189,6 +189,12 @@ public class Speech extends AppCompatActivity {
         String[] words = command.toLowerCase().split(" ");
         Random rand = new Random();
 
+        StringBuilder phrase = new StringBuilder();
+        boolean nounRecognized = false;
+        boolean adjectiveRecognized = false;
+        boolean verbRecognized = false;
+
+
         // Limit the number of words processed based on the word limit (One, Two, or Three Words mode)
         words = Arrays.copyOfRange(words, 0, Math.min(words.length, wordLimit));
 
@@ -201,18 +207,24 @@ public class Speech extends AppCompatActivity {
             if (colorMap.containsKey(word)) {
                 currentColor = word;
                 recognized = true;
+                adjectiveRecognized = true;
+                if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
             }
 
             // Detect motion
             if (motionMap.containsKey(word)) {
                 currentMotion = word;
                 recognized = true;
+                verbRecognized = true;
+                if (!currentMotion.isEmpty()) phrase.append(currentMotion).append(" ");
             }
 
             if (adjectiveMap.containsKey(word)) {
                 currentColor = word;
-                 // New function to handle adjective
+                // New function to handle adjective
                 recognized = true;
+                adjectiveRecognized = true;
+                if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
             }
 
             // Detect object (like "sun", "house")
@@ -225,31 +237,11 @@ public class Speech extends AppCompatActivity {
                     File randomImage = matchingImages.get(random.nextInt(matchingImages.size()));
                     currentObject = randomImage.getName().split("\\.")[0];
                     //currentObject.add(word);
+                    nounRecognized = true;
+                    recognized = true;
+                    if (!currentObject.isEmpty()) phrase.append(word).append(" ");
                 }
 
-                // Build the phrase: color, motion, object
-                StringBuilder phrase = new StringBuilder();
-                if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
-                //if (!currentAdjective.isEmpty()) phrase.append(currentAdjective).append(" ");
-                if (!currentMotion.isEmpty()) phrase.append(currentMotion).append(" ");
-                phrase.append(word);
-
-                // Add phrase to spokenWords for display
-                if (spokenWords.length() > 0) {
-                    spokenWords.append(", ");
-                }
-                spokenWords.append(phrase);
-
-               // handleAdjective(currentAdjective, currentObject);
-                // Apply the color and motion to the image
-                loadImageAndApplyProperties(currentObject, currentColor, currentMotion, rand);
-
-
-                // Reset color and motion for the next phrase
-                currentColor = "";
-                currentMotion = "";
-                currentAdjective = "";
-                continue;
             }
 
             // If the word was not recognized as color, motion, or object, store it in unrecognizedWords
@@ -269,7 +261,73 @@ public class Speech extends AppCompatActivity {
                 return;
             }
         }
+
+        if (spokenWords.length() > 0) {
+            spokenWords.append(", ");
+        }
+        spokenWords.append(phrase);
+
+        if (wordLimit == 1) {
+            if (nounRecognized) {
+                // User said a noun, pick a random adjective and verb
+                currentAdjective = getRandomAdjective();
+                currentMotion = getRandomVerb();
+            } else if (adjectiveRecognized) {
+                // User said an adjective, pick a random noun and verb
+                currentObject = getRandomNoun();
+                currentMotion = getRandomVerb();
+            } else if (verbRecognized) {
+                // User said a verb, pick a random noun and adjective
+                currentObject = getRandomNoun();
+                currentAdjective = getRandomAdjective();
+            }
+        } else if (wordLimit == 2 || wordLimit ==3 ) {
+            // User said two words, find the missing one
+            if (!nounRecognized) {
+                currentObject = getRandomNoun();
+            }
+            if (!adjectiveRecognized) {
+                currentAdjective = getRandomAdjective();
+            }
+            if (!verbRecognized) {
+                currentMotion = getRandomVerb();
+            }
+        }
+
+        // Apply the color and motion to the image
+        loadImageAndApplyProperties(currentObject, currentColor, currentMotion, rand);
+
+        // Reset color and motion for the next phrase
+        currentColor = "";
+        currentMotion = "";
+        currentAdjective = "";
+        currentObject = "";
+        imageView.setScaleY(1.0f);
+        imageView.setScaleX(1.0f);
     }
+
+    // Returns a random noun from the available images in the folder
+    private String getRandomNoun() {
+        File[] nounFiles = imageFolder.listFiles(file -> file.getName().endsWith(".png") || file.getName().endsWith(".svg"));
+        if (nounFiles != null && nounFiles.length > 0) {
+            File randomNounFile = nounFiles[random.nextInt(nounFiles.length)];
+            return randomNounFile.getName().split("\\.")[0];  // Extract noun name from filename
+        }
+        return null;  // Default noun if none are found
+    }
+
+    // Returns a random verb from the motionMap
+    private String getRandomVerb() {
+        List<String> verbs = new ArrayList<>(motionMap.keySet());
+        return verbs.isEmpty() ? "jumping" : verbs.get(random.nextInt(verbs.size()));
+    }
+
+    // Returns a random adjective from the adjectiveMap
+    private String getRandomAdjective() {
+        List<String> adjectives = new ArrayList<>(adjectiveMap.keySet());
+        return adjectives.isEmpty() ? "big" : adjectives.get(random.nextInt(adjectives.size()));
+    }
+
     private List<File> getMatchingImagesForNoun(String noun) {
         // Use a FileFilter with a lambda expression to filter files
         File[] files = imageFolder.listFiles(file -> file.getName().toLowerCase().startsWith(noun.toLowerCase()) && (file.getName().endsWith(".png") || file.getName().endsWith(".svg")));
