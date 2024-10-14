@@ -7,13 +7,9 @@ import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.LinearGradient;
 import android.graphics.Paint;
-import android.graphics.Shader;
-import android.graphics.drawable.BitmapDrawable;
 import android.media.AudioManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -76,6 +72,12 @@ public class Speech extends AppCompatActivity {
     private int wordLimit = 1;  // Default to one word
     private HashMap<String, String> adjectiveMap = new HashMap<>();
 
+    // Flag that allows for motion interruption in case new input happens during the previous motion's duration
+    boolean isMotionPlaying = false;
+
+    // Variables for both motion threads
+    private HandlerThread motionThread;
+    private HandlerThread rotationThread;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -335,12 +337,13 @@ public class Speech extends AppCompatActivity {
                 // Re-center image
                 imageView.setTranslationX(0);
                 imageView.setTranslationY(0);
+
+                handler.removeCallbacksAndMessages(null); // Clear currently processing handler callbacks
+                handler.postDelayed(() -> {
+                    imageView.setImageResource(0);  // Clear image after 5 seconds
+                    resetImageViewScale();  // Reset scaling after clearing the image
+                }, 5000);
             }
-            handler.removeCallbacksAndMessages(null); // Clear currently processing handler callbacks
-            handler.postDelayed(() -> {
-                imageView.setImageResource(0);  // Clear image after 5 seconds
-                resetImageViewScale();  // Reset scaling after clearing the image
-            }, 5000);
         }
     }
 
@@ -378,18 +381,29 @@ public class Speech extends AppCompatActivity {
     }
 
     private void moveImageBasedOnMotion(RecordedMotion motion) {
+        // Stop previous motion early
+        if (isMotionPlaying && motionThread != null && rotationThread != null) {
+            motionThread.quit();
+            rotationThread.quit();
+        }
+
+        // Fetch necessary data
         List<List<Float>> posList = motion.posList;
         List<Long> posIncrements = motion.posIncrements;
+        // Reset image's rotation to default
         imageView.setRotation(0);
+        // Set isMotionPlaying flag to true
+        isMotionPlaying = true;
 
         // Create a thread each for motion and rotation, so they can run concurrently
-        HandlerThread motionThread = new HandlerThread("MotionHandlerThread");
+        motionThread = new HandlerThread("MotionHandlerThread");
         motionThread.start();
         Handler motionHandler = new Handler(motionThread.getLooper());
         motionHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
                 if (!posList.isEmpty()) {
+                    // Set flag
                     // Get and remove next position
                     List<Float> pos = posList.remove(0);
                     // Get and remove current position duration
@@ -400,13 +414,15 @@ public class Speech extends AppCompatActivity {
                     // Repeat until posList is empty
                     motionHandler.postDelayed(this, currentIncrement);
                 } else {
-                    motionThread.quit();
+                    // Indicate that motion is finished
+                    isMotionPlaying = false;
+                    runOnUiThread(() -> imageView.setImageResource(0));
                 }
             }
         }, posIncrements.get(0));
 
         long durationPerIncrement = motion.duration / 500;
-        HandlerThread rotationThread = new HandlerThread("RotationHandlerThread");
+        rotationThread = new HandlerThread("RotationHandlerThread");
         rotationThread.start();
         Handler rotationHandler = new Handler(rotationThread.getLooper());
 
@@ -421,7 +437,8 @@ public class Speech extends AppCompatActivity {
                     if (rotationCount.get() > 0) {
                         rotationHandler.postDelayed(this, durationPerIncrement);
                     } else {
-                        rotationThread.quit();
+                        // Indicate that motion is finished
+                        isMotionPlaying = false;
                     }
                 }
             }, durationPerIncrement);
@@ -437,12 +454,14 @@ public class Speech extends AppCompatActivity {
                     if (rotationCount.get() < 500) {
                         motionHandler.postDelayed(this, durationPerIncrement);
                     } else {
-                        rotationThread.quit();
+                        // Indicate that motion is finished
+                        isMotionPlaying = false;
                     }
                 }
             }, durationPerIncrement);
         }
     }
+    
     private Bitmap loadSVGAsBitmap(File svgFile) {
         try {
             FileInputStream fileInputStream = new FileInputStream(svgFile);
