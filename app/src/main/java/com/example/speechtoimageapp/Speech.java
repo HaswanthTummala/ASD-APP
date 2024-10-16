@@ -188,6 +188,7 @@ public class Speech extends AppCompatActivity {
     private void processResults(String command) {
         String[] words = command.toLowerCase().split(" ");
         Random rand = new Random();
+        resetImageViewScale();
 
         StringBuilder phrase = new StringBuilder();
         boolean nounRecognized = false;
@@ -302,8 +303,8 @@ public class Speech extends AppCompatActivity {
         currentMotion = "";
         currentAdjective = "";
         currentObject = "";
-        imageView.setScaleY(1.0f);
-        imageView.setScaleX(1.0f);
+//        imageView.setScaleY(1.0f);
+//        imageView.setScaleX(1.0f);
     }
 
     // Returns a random noun from the available images in the folder
@@ -564,14 +565,14 @@ public class Speech extends AppCompatActivity {
         adjectiveMap.put("big", "size");
         adjectiveMap.put("small", "size");
 
-        adjectiveMap.put("wide", "size");
-        adjectiveMap.put("narrow", "size");
+        adjectiveMap.put("fat", "size");
+        adjectiveMap.put("thin", "size");
 
         adjectiveMap.put("bright", "light");
         adjectiveMap.put("dark", "light");
 
         // Map to handle pattern adjectives
-        adjectiveMap.put("stripped", "pattern");
+        adjectiveMap.put("striped", "pattern");
         adjectiveMap.put("dotted", "pattern");
 
         // Map to handle texture adjectives
@@ -607,25 +608,25 @@ public class Speech extends AppCompatActivity {
                     imageView.setScaleX(0.25f);
                     imageView.setScaleY(0.25f);
                 }
-            else if(adjective.equals("wide")) {
+            else if(adjective.equals("fat")) {
                     // Increase the horizontal scale of the ImageView to make it wider
-                    imageView.setScaleX(2.0f);  // Make the image 1.5 times wider
-                    imageView.setScaleY(0.5f);  // Keep the height the same
+                    imageView.setScaleX(2.5f);  // Make the image 1.5 times wider
+                    imageView.setScaleY(1.0f);   // Keep the height the same
                 }
 
-            else if(adjective.equals("narrow")) {
+            else if(adjective.equals("thin")) {
                     // Decrease the horizontal scale of the ImageView to make it narrower
-                    imageView.setScaleX(0.5f);  // Make the image half as wide
-                    imageView.setScaleY(2.0f);  // Keep the height the same
+                    imageView.setScaleX(1.0f);  // Make the image half as wide
+                    imageView.setScaleY(2.5f);  // Keep the height the same
                 }
                 break;
 
             case "pattern":
                 // Apply pattern overlay transformations here
                 // e.g., striped or dotted patterns
-                if (adjective.equals("stripped")) {
+                if (adjective.equals("striped")) {
                     // Implement logic to overlay striped pattern on the image
-                     return overlayPatternOnImage("stripped", bitmap);
+                     return overlayPatternOnImage("striped", bitmap);
                 } else if (adjective.equals("dotted")) {
                     // Implement logic to overlay dotted pattern on the image
                      return overlayPatternOnImage("dotted", bitmap);
@@ -655,18 +656,6 @@ public class Speech extends AppCompatActivity {
                 } else if (adjective.equals("opaque")) {
                     return changeImageOpacity(bitmap, 1.0f);  // Fully visible
                 }
-                break;
-
-            case "wide":
-                // Increase the horizontal scale of the ImageView to make it wider
-                imageView.setScaleX(1.5f);  // Make the image 1.5 times wider
-                imageView.setScaleY(1.0f);  // Keep the height the same
-                break;
-
-            case "narrow":
-                // Decrease the horizontal scale of the ImageView to make it narrower
-                imageView.setScaleX(0.5f);  // Make the image half as wide
-                imageView.setScaleY(1.0f);  // Keep the height the same
                 break;
 
         }
@@ -750,7 +739,7 @@ public class Speech extends AppCompatActivity {
 
             // Determine the pattern to draw
             switch (pattern) {
-                case "stripped":
+                case "striped":
                     // Draw horizontal stripes on the object only (skip transparent pixels)
                     for (int y = 0; y < mutableBitmap.getHeight(); y += 30) {  // Change `30` to adjust stripe spacing
                         // Check for the object boundaries on this row
