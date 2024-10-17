@@ -217,14 +217,14 @@
                             android:layout_gravity="center"
                             android:clickable="true"
                             android:focusable="true"
-                            android:onClick="goToDemoPage"
-                            android:src="@drawable/baseline_ondemand_video_24" />
+                            android:onClick="goToUserPage"
+                            android:src="@drawable/baseline_person_add_24" />
 
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:layout_gravity="center"
-                            android:text="Demo"
+                            android:text="Add User"
 
                             android:textSize="16sp"
                             android:layout_marginTop="8dp"/>

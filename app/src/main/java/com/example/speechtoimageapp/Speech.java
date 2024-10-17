@@ -85,7 +85,7 @@ public class Speech extends AppCompatActivity {
         setContentView(R.layout.activity_speech);
 
         imageView = findViewById(R.id.imageView);
-        speakButton = findViewById(R.id.buttonSpeak);
+
         handler = new Handler();
 
         // Initialize color and motion mappings
@@ -188,7 +188,6 @@ public class Speech extends AppCompatActivity {
     private void processResults(String command) {
         String[] words = command.toLowerCase().split(" ");
         Random rand = new Random();
-        resetImageViewScale();
 
         StringBuilder phrase = new StringBuilder();
         boolean nounRecognized = false;
@@ -303,8 +302,8 @@ public class Speech extends AppCompatActivity {
         currentMotion = "";
         currentAdjective = "";
         currentObject = "";
-//        imageView.setScaleY(1.0f);
-//        imageView.setScaleX(1.0f);
+        imageView.setScaleY(1.0f);
+        imageView.setScaleX(1.0f);
     }
 
     // Returns a random noun from the available images in the folder
@@ -435,92 +434,11 @@ public class Speech extends AppCompatActivity {
                     ? selectedMotions.get(rand.nextInt(selectedMotions.size()))
                     : selectedMotions.get(0);
 
-            moveImageBasedOnMotion(selectedMotion);
+
         }
     }
 
-    private void moveImageBasedOnMotion(RecordedMotion motion) {
-        // Stop previous motion early
-        if (isMotionPlaying && motionThread != null && rotationThread != null) {
-            motionThread.quit();
-            rotationThread.quit();
-        }
 
-        // Fetch necessary data
-        List<List<Float>> posList = motion.posList;
-        List<Long> posIncrements = motion.posIncrements;
-        // Reset image's rotation to default
-        imageView.setRotation(0);
-        // Set isMotionPlaying flag to true
-        isMotionPlaying = true;
-
-        // Create a thread each for motion and rotation, so they can run concurrently
-        motionThread = new HandlerThread("MotionHandlerThread");
-        motionThread.start();
-        Handler motionHandler = new Handler(motionThread.getLooper());
-        motionHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (!posList.isEmpty()) {
-                    // Set flag
-                    // Get and remove next position
-                    List<Float> pos = posList.remove(0);
-                    // Get and remove current position duration
-                    long currentIncrement = posIncrements.remove(0);
-                    // Set image's position to next position
-                    imageView.setX(pos.get(0) - imageView.getWidth() / 2);
-                    imageView.setY(pos.get(1) - imageView.getHeight() / 2);
-                    // Repeat until posList is empty
-                    motionHandler.postDelayed(this, currentIncrement);
-                } else {
-                    // Indicate that motion is finished
-                    isMotionPlaying = false;
-                    runOnUiThread(() -> imageView.setImageResource(0));
-                }
-            }
-        }, posIncrements.get(0));
-
-        long durationPerIncrement = motion.duration / 500;
-        rotationThread = new HandlerThread("RotationHandlerThread");
-        rotationThread.start();
-        Handler rotationHandler = new Handler(rotationThread.getLooper());
-
-        if (motion.rotFlag) {
-            AtomicInteger rotationCount = new AtomicInteger(motion.angleList.size());
-
-            rotationHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    rotationCount.getAndDecrement();
-                    imageView.setRotation(motion.angleList.remove(0));
-                    if (rotationCount.get() > 0) {
-                        rotationHandler.postDelayed(this, durationPerIncrement);
-                    } else {
-                        // Indicate that motion is finished
-                        isMotionPlaying = false;
-                    }
-                }
-            }, durationPerIncrement);
-        } else {
-            float degreesPerIncrement = ((((float) motion.duration / 1000) * motion.rotationsPerSecond) / 500) * 360;
-            AtomicInteger rotationCount = new AtomicInteger(0);
-
-            rotationHandler.postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    int count = rotationCount.getAndIncrement();
-                    imageView.setRotation(count * degreesPerIncrement);
-                    if (rotationCount.get() < 500) {
-                        motionHandler.postDelayed(this, durationPerIncrement);
-                    } else {
-                        // Indicate that motion is finished
-                        isMotionPlaying = false;
-                    }
-                }
-            }, durationPerIncrement);
-        }
-    }
-    
     private Bitmap loadSVGAsBitmap(File svgFile) {
         try {
             FileInputStream fileInputStream = new FileInputStream(svgFile);
@@ -565,14 +483,14 @@ public class Speech extends AppCompatActivity {
         adjectiveMap.put("big", "size");
         adjectiveMap.put("small", "size");
 
-        adjectiveMap.put("fat", "size");
-        adjectiveMap.put("thin", "size");
+        adjectiveMap.put("wide", "size");
+        adjectiveMap.put("narrow", "size");
 
         adjectiveMap.put("bright", "light");
         adjectiveMap.put("dark", "light");
 
         // Map to handle pattern adjectives
-        adjectiveMap.put("striped", "pattern");
+        adjectiveMap.put("stripped", "pattern");
         adjectiveMap.put("dotted", "pattern");
 
         // Map to handle texture adjectives
@@ -608,25 +526,25 @@ public class Speech extends AppCompatActivity {
                     imageView.setScaleX(0.25f);
                     imageView.setScaleY(0.25f);
                 }
-            else if(adjective.equals("fat")) {
+            else if(adjective.equals("wide")) {
                     // Increase the horizontal scale of the ImageView to make it wider
-                    imageView.setScaleX(2.5f);  // Make the image 1.5 times wider
-                    imageView.setScaleY(1.0f);   // Keep the height the same
+                    imageView.setScaleX(2.0f);  // Make the image 1.5 times wider
+                    imageView.setScaleY(0.5f);  // Keep the height the same
                 }
 
-            else if(adjective.equals("thin")) {
+            else if(adjective.equals("narrow")) {
                     // Decrease the horizontal scale of the ImageView to make it narrower
-                    imageView.setScaleX(1.0f);  // Make the image half as wide
-                    imageView.setScaleY(2.5f);  // Keep the height the same
+                    imageView.setScaleX(0.5f);  // Make the image half as wide
+                    imageView.setScaleY(2.0f);  // Keep the height the same
                 }
                 break;
 
             case "pattern":
                 // Apply pattern overlay transformations here
                 // e.g., striped or dotted patterns
-                if (adjective.equals("striped")) {
+                if (adjective.equals("stripped")) {
                     // Implement logic to overlay striped pattern on the image
-                     return overlayPatternOnImage("striped", bitmap);
+                     return overlayPatternOnImage("stripped", bitmap);
                 } else if (adjective.equals("dotted")) {
                     // Implement logic to overlay dotted pattern on the image
                      return overlayPatternOnImage("dotted", bitmap);
@@ -656,6 +574,18 @@ public class Speech extends AppCompatActivity {
                 } else if (adjective.equals("opaque")) {
                     return changeImageOpacity(bitmap, 1.0f);  // Fully visible
                 }
+                break;
+
+            case "wide":
+                // Increase the horizontal scale of the ImageView to make it wider
+                imageView.setScaleX(1.5f);  // Make the image 1.5 times wider
+                imageView.setScaleY(1.0f);  // Keep the height the same
+                break;
+
+            case "narrow":
+                // Decrease the horizontal scale of the ImageView to make it narrower
+                imageView.setScaleX(0.5f);  // Make the image half as wide
+                imageView.setScaleY(1.0f);  // Keep the height the same
                 break;
 
         }
@@ -739,7 +669,7 @@ public class Speech extends AppCompatActivity {
 
             // Determine the pattern to draw
             switch (pattern) {
-                case "striped":
+                case "stripped":
                     // Draw horizontal stripes on the object only (skip transparent pixels)
                     for (int y = 0; y < mutableBitmap.getHeight(); y += 30) {  // Change `30` to adjust stripe spacing
                         // Check for the object boundaries on this row

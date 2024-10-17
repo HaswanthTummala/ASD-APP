@@ -73,9 +73,9 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         startActivity(intentHistory);
     }
 
-    public void goToDemoPage(View view) {
-        Intent intentDemo = new Intent(MainActivity.this, demo.class);
-        startActivity(intentDemo);
+    public void goToUserPage(View view) {
+        Intent intent = new Intent(this, UserActivity.class);  // Ensure this points to UserActivity
+        startActivity(intent);
     }
 
     public void goToSettingsPage(View view) {
