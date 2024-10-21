@@ -609,6 +609,8 @@ public class Speech extends AppCompatActivity {
         colorMap.put("orange", Color.rgb(255, 165, 0));
         colorMap.put("purple", Color.rgb(128, 0, 128));
         colorMap.put("pink", Color.rgb(255, 192, 203));
+        colorMap.put("lime", Color.rgb(50,205,50 ));
+        colorMap.put("indigo", Color.rgb(75,0,130));
     }
 
     private void initializeAdjectiveMap() {
