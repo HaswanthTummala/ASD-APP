@@ -354,6 +354,7 @@ public class Speech extends AppCompatActivity {
 
         // Apply the color and motion to the image
         loadImageAndApplyProperties(currentObject, currentColor, currentMotion, rand);
+        playSoundForObject(currentObject);
 
         // Reset color and motion for the next phrase
         currentColor = "";
