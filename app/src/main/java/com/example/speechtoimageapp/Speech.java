@@ -249,10 +249,14 @@ public class Speech extends AppCompatActivity {
         String[] words = command.toLowerCase().split(" ");
         Random rand = new Random();
 
+        StringBuilder phrase = new StringBuilder();
+        boolean nounRecognized = false;
+        boolean adjectiveRecognized = false;
+        boolean verbRecognized = false;
+
+
         // Limit the number of words processed based on the word limit (One, Two, or Three Words mode)
         words = Arrays.copyOfRange(words, 0, Math.min(words.length, wordLimit));
-
-        StringBuilder phrase = new StringBuilder();
 
         for (String word : words) {
             word = word.trim();  // Clean up word
@@ -263,28 +267,39 @@ public class Speech extends AppCompatActivity {
             if (colorMap.containsKey(word)) {
                 currentColor = word;
                 recognized = true;
+                adjectiveRecognized = true;
+                if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
             }
 
             // Detect motion
             if (motionMap.containsKey(word)) {
                 currentMotion = word;
                 recognized = true;
+                verbRecognized = true;
+                if (!currentMotion.isEmpty()) phrase.append(currentMotion).append(" ");
             }
 
             if (adjectiveMap.containsKey(word)) {
                 currentColor = word;
+                // New function to handle adjective
                 recognized = true;
+                adjectiveRecognized = true;
+                if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
             }
 
             // Detect object (like "sun", "house")
             if (new File(imageFolder, word + ".png").exists() || new File(imageFolder, word + ".svg").exists()) {
+
                 List<File> matchingImages = getMatchingImagesForNoun(word);
                 if (!matchingImages.isEmpty()) {
-                    File randomImage = matchingImages.get(rand.nextInt(matchingImages.size()));
+                    // Randomly select one matching image and display it
+                    File randomImage = matchingImages.get(random.nextInt(matchingImages.size()));
                     currentObject = randomImage.getName().split("\\.")[0];
+                    nounRecognized = true;
+                    recognized = true;
+                    if (!currentObject.isEmpty()) phrase.append(word).append(" ");
                 }
 
-                recognized = true;
             }
 
             // If the word was not recognized as color, motion, or object, store it in unrecognizedWords
@@ -294,92 +309,79 @@ public class Speech extends AppCompatActivity {
                 }
                 unrecognizedWords.append(word);
             }
+
             // Handle the stop command
             if (word.equals("stop")) {
                 String endTime = getCurrentTimestamp();
                 saveSessionData(startTime, endTime, spokenWords.toString().trim(), unrecognizedWords.toString().trim());
                 stopListeningAndReturnToMain();
-                unMuteAudio();  // Un-mute audio again back to previous volume
-                return;  // Stop processing further words
+                unMuteAudio(); // Un-mute audio again back to previous volume
+                return;
             }
         }
 
-        // Handle different word modes
-        switch (wordLimit) {
-            case 1:  // One word mode
-                // If the user spoke only one word, fill in random image, color, and motion
-                if (currentObject.isEmpty()) {
-                    currentObject = getRandomObject();  // Random object
-                }
-                if (currentColor.isEmpty()) {
-                    currentColor = getRandomColor();  // Random color
-                }
-                if (currentMotion.isEmpty()) {
-                    currentMotion = getRandomMotion();  // Random motion
-                }
-                break;
-
-            case 2:  // Two word mode
-                // If two words are spoken, randomly select the third item (image/motion/color)
-                if (currentObject.isEmpty()) {
-                    currentObject = getRandomObject();  // Random object
-                }
-                if (currentColor.isEmpty()) {
-                    currentColor = getRandomColor();  // Random color
-                }
-                if (currentMotion.isEmpty()) {
-                    currentMotion = getRandomMotion();  // Random motion
-                }
-                break;
-
-            case 3:  // Three word mode
-                // User must speak three words; if not, give an error message and return
-                if (words.length < 3) {
-                    Toast.makeText(this, "Please provide three words (e.g., 'red jumping ball').", Toast.LENGTH_LONG).show();
-                    return;
-                }
-                break;
-        }
-
-        // Build the phrase: color, motion, object
-        if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
-        if (!currentMotion.isEmpty()) phrase.append(currentMotion).append(" ");
-        phrase.append(currentObject);
-
-        // Add phrase to spokenWords for display
         if (spokenWords.length() > 0) {
             spokenWords.append(", ");
         }
         spokenWords.append(phrase);
 
+        if (wordLimit == 1) {
+            if (nounRecognized) {
+                // User said a noun, pick a random adjective and verb
+                currentAdjective = getRandomAdjective();
+                currentMotion = getRandomVerb();
+            } else if (adjectiveRecognized) {
+                // User said an adjective, pick a random noun and verb
+                currentObject = getRandomNoun();
+                currentMotion = getRandomVerb();
+            } else if (verbRecognized) {
+                // User said a verb, pick a random noun and adjective
+                currentObject = getRandomNoun();
+                currentAdjective = getRandomAdjective();
+            }
+        } else if (wordLimit == 2 || wordLimit ==3 ) {
+            // User said two words, find the missing one
+            if (!nounRecognized) {
+                currentObject = getRandomNoun();
+            }
+            if (!adjectiveRecognized) {
+                currentAdjective = getRandomAdjective();
+            }
+            if (!verbRecognized) {
+                currentMotion = getRandomVerb();
+            }
+        }
+
         // Apply the color and motion to the image
         loadImageAndApplyProperties(currentObject, currentColor, currentMotion, rand);
-        playSoundForObject(currentObject);  // Play corresponding sound for the object
 
         // Reset color and motion for the next phrase
         currentColor = "";
         currentMotion = "";
+        currentAdjective = "";
         currentObject = "";
+        imageView.setScaleY(1.0f);
+        imageView.setScaleX(1.0f);
     }
 
     // Helper function to get random object
-    private String getRandomObject() {
-        File[] files = imageFolder.listFiles(file -> file.getName().endsWith(".png") || file.getName().endsWith(".svg"));
-        if (files != null && files.length > 0) {
-            File randomImage = files[new Random().nextInt(files.length)];
-            return randomImage.getName().split("\\.")[0];
+    private String getRandomNoun() {
+        File[] nounFiles = imageFolder.listFiles(file -> file.getName().endsWith(".png") || file.getName().endsWith(".svg"));
+        if (nounFiles != null && nounFiles.length > 0) {
+            File randomNounFile = nounFiles[random.nextInt(nounFiles.length)];
+            return randomNounFile.getName().split("\\.")[0];  // Extract noun name from filename
         }
-        return "default_object";  // Default if no image available
+        return null;
     }
 
     // Helper function to get random color
-    private String getRandomColor() {
-        List<String> colors = new ArrayList<>(colorMap.keySet());
-        return colors.get(new Random().nextInt(colors.size()));
+    private String getRandomAdjective() {
+        List<String> adjectives = new ArrayList<>(adjectiveMap.keySet());
+        return adjectives.isEmpty() ? "big" : adjectives.get(random.nextInt(adjectives.size()));
     }
 
     // Helper function to get random motion
-    private String getRandomMotion() {
+    private String getRandomVerb() {
         List<String> motions = new ArrayList<>(motionMap.keySet());
         return motions.get(new Random().nextInt(motions.size()));
 
