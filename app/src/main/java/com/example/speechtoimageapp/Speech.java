@@ -611,12 +611,17 @@ public class Speech extends AppCompatActivity {
         colorMap.put("pink", Color.rgb(255, 192, 203));
         colorMap.put("lime", Color.rgb(50,205,50 ));
         colorMap.put("indigo", Color.rgb(75,0,130));
+        colorMap.put("magenta", Color.rgb(255,0,255));
     }
 
     private void initializeAdjectiveMap() {
         // Map to handle size adjectives
         adjectiveMap.put("big", "size");
         adjectiveMap.put("small", "size");
+        adjectiveMap.put("tiny","size");
+        adjectiveMap.put("little","size");
+        adjectiveMap.put("huge","size");
+        adjectiveMap.put("large","size");
 
         adjectiveMap.put("wide", "size");
         adjectiveMap.put("narrow", "size");
@@ -660,6 +665,18 @@ public class Speech extends AppCompatActivity {
                 } else if (adjective.equals("small")) {
                     imageView.setScaleX(0.25f);
                     imageView.setScaleY(0.25f);
+                }
+                else if (adjective.equals("tiny") || adjective.equals("little")) {
+                    imageView.setScaleX(0.05f);
+                    imageView.setScaleY(0.05f);
+                }
+                else if (adjective.equals("huge")) {
+                    imageView.setScaleX(2.5f);
+                    imageView.setScaleY(2.5f);
+                }
+                else if (adjective.equals("large")) {
+                    imageView.setScaleX(2.5f);
+                    imageView.setScaleY(1.5f);
                 }
                 else if(adjective.equals("wide")) {
                     // Increase the horizontal scale of the ImageView to make it wider
@@ -710,19 +727,6 @@ public class Speech extends AppCompatActivity {
                     return changeImageOpacity(bitmap, 1.0f);  // Fully visible
                 }
                 break;
-
-            case "wide":
-                // Increase the horizontal scale of the ImageView to make it wider
-                imageView.setScaleX(1.5f);  // Make the image 1.5 times wider
-                imageView.setScaleY(1.0f);  // Keep the height the same
-                break;
-
-            case "narrow":
-                // Decrease the horizontal scale of the ImageView to make it narrower
-                imageView.setScaleX(0.5f);  // Make the image half as wide
-                imageView.setScaleY(1.0f);  // Keep the height the same
-                break;
-
         }
         return bitmap;
     }
