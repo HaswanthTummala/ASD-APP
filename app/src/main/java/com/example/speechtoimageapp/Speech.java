@@ -354,7 +354,7 @@ public class Speech extends AppCompatActivity {
 
         // Apply the color and motion to the image
         loadImageAndApplyProperties(currentObject, currentColor, currentMotion, rand);
-        playSoundForObject(currentObject);
+       // playSoundForObject(currentObject);
 
         // Reset color and motion for the next phrase
         currentColor = "";
@@ -491,6 +491,7 @@ public class Speech extends AppCompatActivity {
                 resetImageViewScale();  // Reset scaling after clearing the image
             }, 5000);
         }
+        playSoundForObject(currentObject);
     }
 
     private void resetImageViewScale() {
