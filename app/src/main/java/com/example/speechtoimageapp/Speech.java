@@ -11,18 +11,18 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.drawable.BitmapDrawable;
+import android.media.AudioAttributes;
 import android.media.AudioManager;
-import android.media.MediaPlayer;
+import android.media.SoundPool;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
+import android.os.StrictMode;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
 import android.speech.SpeechRecognizer;
-import android.view.View;
+import android.util.Log;
 import android.widget.ArrayAdapter;
-import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.Spinner;
 import android.widget.Toast;
@@ -48,7 +48,6 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Random;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 public class Speech extends AppCompatActivity {
 
@@ -57,79 +56,100 @@ public class Speech extends AppCompatActivity {
     private SpeechRecognizer speechRecognizer;
     private Handler handler;
     private boolean isListening = true;
-    private MediaPlayer mediaPlayer;  // MediaPlayer for audio playback
+    private SoundPool soundPool;  // SoundPool for audio playback
+    private HashMap<String, Integer> soundMap;  // Map to store sound IDs for objects
 
     // Define color and motion mappings
     private HashMap<String, Integer> colorMap = new HashMap<>();
     private HashMap<String, ArrayList<RecordedMotion>> motionMap = new HashMap<>();
     private File imageFolder;
 
-    private StringBuilder spokenWords = new StringBuilder();  // To collect spoken phrases
-    private StringBuilder unrecognizedWords = new StringBuilder();  // To collect unrecognized words
-    private String startTime;  // Track the start time
+    private StringBuilder spokenWords = new StringBuilder();
+    private StringBuilder unrecognizedWords = new StringBuilder();
+    private String startTime;
     private Random random = new Random();
-    // Temporary variables to store detected color, motion, and object
     private String currentColor = "";
     private String currentMotion = "";
     private String currentObject = "";
     private String currentAdjective = "";
 
-    private int wordLimit = 1;  // Default to one word
+    private int wordLimit = 1;
     private HashMap<String, String> adjectiveMap = new HashMap<>();
-    // Flag that allows for motion interruption in case new input happens during the previous motion's duration
-    boolean isMotionPlaying = false;
     private ArrayList<String> userList;
-    // Variables for both motion threads
-    private HandlerThread motionThread;
-    private HandlerThread rotationThread;
+
+    private HandlerThread motionThread = new HandlerThread("MotionHandlerThread");
+    private HandlerThread rotationThread = new HandlerThread("RotationHandlerThread");
+    private Handler motionHandler;
+    private Handler rotationHandler;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_speech);
 
+        // Enable StrictMode for debugging potential issues
+        StrictMode.setThreadPolicy(new StrictMode.ThreadPolicy.Builder()
+                .detectAll()
+                .penaltyLog()
+                .build());
+        StrictMode.setVmPolicy(new StrictMode.VmPolicy.Builder()
+                .detectLeakedSqlLiteObjects()
+                .detectLeakedClosableObjects()
+                .penaltyLog()
+                .build());
+
         imageView = findViewById(R.id.imageView);
         handler = new Handler();
 
-        // Initialize color and motion mappings
         initializeColorMap();
         initializeAdjectiveMap();
         motionMap = readMotions();
 
-        // Load uploaded images directory
         imageFolder = new File(getFilesDir(), "UploadedImages");
 
-        // Load word mode from SharedPreferences
         SharedPreferences preferences = getSharedPreferences("SpeechToImageAppSettings", MODE_PRIVATE);
-        String wordMode = preferences.getString("WordMode", "One Word");  // Default to One Word
+        String wordMode = preferences.getString("WordMode", "One Word");
         wordLimit = wordMode.equals("Two Words") ? 2 : wordMode.equals("Three Words") ? 3 : 1;
-        // Set up recognizer intent
+
         final Intent recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
-        // Load users from User class
-        userList = User.loadUserList(this);
 
-        // Show name input dialog when the page opens
+        userList = User.loadUserList(this);
         promptForUserSelection();
 
-        // Request microphone permission
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.RECORD_AUDIO}, REQUEST_RECORD_AUDIO_PERMISSION_CODE);
         }
 
-        // Initialize Speech Recognizer
         speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this);
+
+        AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_MEDIA)
+                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                .build();
+
+        soundPool = new SoundPool.Builder()
+                .setMaxStreams(5)
+                .setAudioAttributes(audioAttributes)
+                .build();
+
+        soundMap = new HashMap<>();
+        loadSounds();
+
+        motionThread.start();
+        rotationThread.start();
+        motionHandler = new Handler(motionThread.getLooper());
+        rotationHandler = new Handler(rotationThread.getLooper());
     }
 
-    // Show a dialog to prompt the user to enter their name
     private void promptForUserSelection() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Select Your Name");
 
-        // Set up the dropdown (Spinner) for selecting the user
         final Spinner userSpinner = new Spinner(this);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this, android.R.layout.simple_spinner_dropdown_item, userList);
         userSpinner.setAdapter(adapter);
@@ -138,53 +158,42 @@ public class Speech extends AppCompatActivity {
         builder.setPositiveButton("Start", (dialog, which) -> {
             String selectedName = userSpinner.getSelectedItem().toString().trim();
 
-            // Save the selected user in SharedPreferences
             SharedPreferences userPrefs = getSharedPreferences("UserPrefs", MODE_PRIVATE);
             SharedPreferences.Editor userEditor = userPrefs.edit();
             userEditor.putString("current_user", selectedName);
             userEditor.apply();
-
-            // Mute system sounds before starting speech recognition
             muteAudio();
-
-            // Start the speech recognition process
             startSpeechRecognition();
         });
 
         builder.setNegativeButton("Cancel", (dialog, which) -> {
             dialog.cancel();
-            finish();  // Close the activity if the user cancels
+            finish();
         });
 
         builder.show();
     }
 
-
-    // Start the speech recognition process
     private void startSpeechRecognition() {
+        muteMicrophoneBeep();
         final Intent recognizerIntent = new Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault());
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, 5000L);
         recognizerIntent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true);
 
-        // Set recognition listener
         speechRecognizer.setRecognitionListener(new RecognitionListener() {
             @Override
-            public void onReadyForSpeech(Bundle params) {
-            }
+            public void onReadyForSpeech(Bundle params) {}
 
             @Override
-            public void onBeginningOfSpeech() {
-            }
+            public void onBeginningOfSpeech() {}
 
             @Override
-            public void onRmsChanged(float rmsdB) {
-            }
+            public void onRmsChanged(float rmsdB) {}
 
             @Override
-            public void onBufferReceived(byte[] buffer) {
-            }
+            public void onBufferReceived(byte[] buffer) {}
 
             @Override
             public void onEndOfSpeech() {
@@ -202,68 +211,102 @@ public class Speech extends AppCompatActivity {
                 if (isListening) {
                     speechRecognizer.startListening(recognizerIntent);
                 }
-                motionMap = readMotions();
             }
 
             @Override
-            public void onPartialResults(Bundle bundle) {
-            }
+            public void onPartialResults(Bundle bundle) {}
 
             @Override
             public void onError(int error) {
-                if (isListening) {
-                    speechRecognizer.startListening(recognizerIntent);
-                }
+                // Add a delay before restarting
+                handler.postDelayed(() -> {
+                    if (isListening) {
+                        speechRecognizer.startListening(recognizerIntent);
+                    }
+                }, 2000); // 2 seconds delay to reduce load
             }
 
             @Override
-            public void onEvent(int i, Bundle bundle) {
-            }
+            public void onEvent(int i, Bundle bundle) {}
         });
 
-        // Start listening
-        spokenWords.setLength(0);  // Clear previous spoken words
-        unrecognizedWords.setLength(0);  // Clear previous unrecognized words
-        startTime = getCurrentTimestamp();  // Capture the start time
+        spokenWords.setLength(0);
+        unrecognizedWords.setLength(0);
+        startTime = getCurrentTimestamp();
         speechRecognizer.startListening(recognizerIntent);
     }
 
     @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        speechRecognizer.cancel();
-        speechRecognizer.destroy();
-        if (mediaPlayer != null) {
-            mediaPlayer.release();
+    protected void onPause() {
+        super.onPause();
+        if (speechRecognizer != null) {
+            speechRecognizer.stopListening();
+            speechRecognizer.cancel();
+            speechRecognizer.destroy();
         }
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
+        }
+        motionHandler.removeCallbacksAndMessages(null);
+        rotationHandler.removeCallbacksAndMessages(null);
+    }
+    private void logMemoryUsage() {
+        Runtime runtime = Runtime.getRuntime();
+        long usedMemInMB = (runtime.totalMemory() - runtime.freeMemory()) / 1048576L;
+        long maxHeapSizeInMB = runtime.maxMemory() / 1048576L;
+        Log.d("MemoryUsage", "Used Memory: " + usedMemInMB + " MB, Max Heap Size: " + maxHeapSizeInMB + " MB");
     }
 
-    // Other methods for handling speech processing...
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        releaseResources();
+    }
 
+    private void releaseResources() {
+        if (speechRecognizer != null) {
+            speechRecognizer.stopListening();
+            speechRecognizer.cancel();
+            speechRecognizer.destroy();
+        }
+        if (soundPool != null) {
+            soundPool.release();
+            soundPool = null;
+        }
+        if (motionHandler != null) {
+            motionHandler.removeCallbacksAndMessages(null);
+        }
+        if (rotationHandler != null) {
+            rotationHandler.removeCallbacksAndMessages(null);
+        }
+        if (motionThread != null) {
+            motionThread.quitSafely();
+        }
+        if (rotationThread != null) {
+            rotationThread.quitSafely();
+        }
+    }
     private String getCurrentTimestamp() {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.getDefault()).format(new Date());
     }
 
     private void processResults(String command) {
         String[] words = command.toLowerCase().split(" ");
-        Random rand = new Random();
 
+        Random rand = new Random();
         StringBuilder phrase = new StringBuilder();
         boolean nounRecognized = false;
         boolean adjectiveRecognized = false;
         boolean verbRecognized = false;
-
-
         // Limit the number of words processed based on the word limit (One, Two, or Three Words mode)
         words = Arrays.copyOfRange(words, 0, Math.min(words.length, wordLimit));
 
-        for (String word : words) {
-            word = word.trim();  // Clean up word
-
+        for (int i = words.length - 1; i >= 0; i--) {
+            String word = words[i].trim();
             boolean recognized = false;
 
-            // Detect color
             if (colorMap.containsKey(word)) {
                 currentColor = word;
                 recognized = true;
@@ -271,7 +314,6 @@ public class Speech extends AppCompatActivity {
                 if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
             }
 
-            // Detect motion
             if (motionMap.containsKey(word)) {
                 currentMotion = word;
                 recognized = true;
@@ -281,28 +323,24 @@ public class Speech extends AppCompatActivity {
 
             if (adjectiveMap.containsKey(word)) {
                 currentColor = word;
-                // New function to handle adjective
                 recognized = true;
                 adjectiveRecognized = true;
                 if (!currentColor.isEmpty()) phrase.append(currentColor).append(" ");
             }
 
-            // Detect object (like "sun", "house")
             if (new File(imageFolder, word + ".png").exists() || new File(imageFolder, word + ".svg").exists()) {
-
                 List<File> matchingImages = getMatchingImagesForNoun(word);
                 if (!matchingImages.isEmpty()) {
-                    // Randomly select one matching image and display it
                     File randomImage = matchingImages.get(random.nextInt(matchingImages.size()));
                     currentObject = randomImage.getName().split("\\.")[0];
                     nounRecognized = true;
                     recognized = true;
                     if (!currentObject.isEmpty()) phrase.append(word).append(" ");
+                    // Play sound for recognized object immediately
+                    playSoundForObject(currentObject);
                 }
-
             }
 
-            // If the word was not recognized as color, motion, or object, store it in unrecognizedWords
             if (!recognized) {
                 if (unrecognizedWords.length() > 0) {
                     unrecognizedWords.append(", ");
@@ -310,12 +348,11 @@ public class Speech extends AppCompatActivity {
                 unrecognizedWords.append(word);
             }
 
-            // Handle the stop command
             if (word.equals("stop")) {
                 String endTime = getCurrentTimestamp();
                 saveSessionData(startTime, endTime, spokenWords.toString().trim(), unrecognizedWords.toString().trim());
                 stopListeningAndReturnToMain();
-                unMuteAudio(); // Un-mute audio again back to previous volume
+                unMuteAudio();
                 return;
             }
         }
@@ -325,47 +362,103 @@ public class Speech extends AppCompatActivity {
         }
         spokenWords.append(phrase);
 
-        if (wordLimit == 1) {
-            if (nounRecognized) {
-                // User said a noun, pick a random adjective and verb
-                currentAdjective = getRandomAdjective();
-                currentMotion = getRandomVerb();
-            } else if (adjectiveRecognized) {
-                // User said an adjective, pick a random noun and verb
-                currentObject = getRandomNoun();
-                currentMotion = getRandomVerb();
-            } else if (verbRecognized) {
-                // User said a verb, pick a random noun and adjective
-                currentObject = getRandomNoun();
-                currentAdjective = getRandomAdjective();
-            }
-        } else if (wordLimit == 2 || wordLimit ==3 ) {
-            // User said two words, find the missing one
-            if (!nounRecognized) {
-                currentObject = getRandomNoun();
-            }
-            if (!adjectiveRecognized) {
-                currentAdjective = getRandomAdjective();
-            }
-            if (!verbRecognized) {
-                currentMotion = getRandomVerb();
-            }
+        switch (wordLimit) {
+            case 1:
+                if (nounRecognized && currentColor.isEmpty()) {
+                    currentColor = getRandomColor();
+                    currentAdjective = getRandomAdjective();
+                    currentMotion = getRandomVerb();
+                } else if (adjectiveRecognized && currentObject.isEmpty()) {
+                    currentObject = getRandomNoun();
+                    currentObject = getRandomNoun();
+                    currentMotion = getRandomVerb();
+                } else if (verbRecognized) {
+                    if (currentObject.isEmpty()) {
+                        currentObject = getRandomNoun();
+                    currentAdjective = getRandomAdjective();
+                }}
+                break;
+            case 2:
+                // Two-word mode
+                if (currentObject.isEmpty()) {
+                    currentObject = getRandomNoun();
+                }
+                if (currentColor.isEmpty()) {
+                    currentColor = getRandomColor();
+                }
+                if (currentMotion.isEmpty()) {
+                    currentMotion = getRandomVerb();
+                }
+                break;
+            case 3:
+                if (words.length < 3) {
+                    Toast.makeText(this, "Please provide three words (e.g., 'red jumping ball').", Toast.LENGTH_LONG).show();
+                    return;
+                }
+                break;
         }
 
-        // Apply the color and motion to the image
-        loadImageAndApplyProperties(currentObject, currentColor, currentMotion, rand);
-       // playSoundForObject(currentObject);
+        // Updated processResults method call
+        loadImageAndApplyProperties(currentObject, currentColor, currentMotion, random);
 
-        // Reset color and motion for the next phrase
+        playSoundForObject(currentObject);
+
         currentColor = "";
         currentMotion = "";
         currentAdjective = "";
         currentObject = "";
-        imageView.setScaleY(1.0f);
-        imageView.setScaleX(1.0f);
+    }
+    private String getRandomColor() {
+        List<String> colors = new ArrayList<>(colorMap.keySet());
+        return colors.get(new Random().nextInt(colors.size()));
+    }
+    private void playSoundForObject(String objectName) {
+        Integer soundId = soundMap.get(objectName.toLowerCase());
+        if (soundId != null) {
+            // Play specific sound for the recognized object
+            soundPool.play(soundId, 1.0f, 1.0f, 1, 0, 1.0f);
+        } else if (imageExists(objectName)) {
+            // Play default sound only if an image exists but has no specific sound
+            Integer defaultSoundId = soundMap.get("default");
+            if (defaultSoundId != null) {
+                soundPool.play(defaultSoundId, 1.0f, 1.0f, 1, 0, 1.0f);
+            }
+        }
     }
 
-    // Helper function to get random object
+    // Helper method to check if an image exists for the object
+    private boolean imageExists(String objectName) {
+        File imageFilePNG = new File(imageFolder, objectName + ".png");
+        File imageFileSVG = new File(imageFolder, objectName + ".svg");
+        return imageFilePNG.exists() || imageFileSVG.exists();
+    }
+
+    private void loadSounds() {
+        soundMap.put("cat", soundPool.load(this, R.raw.cat, 1));
+        soundMap.put("ball", soundPool.load(this, R.raw.ball, 1));
+        soundMap.put("cow", soundPool.load(this, R.raw.cow, 1));
+        soundMap.put("rooster", soundPool.load(this, R.raw.rooster, 1));
+        soundMap.put("dog", soundPool.load(this, R.raw.dog, 1));
+        soundMap.put("default", soundPool.load(this, R.raw.common, 1));  // Default sound
+    }
+
+    // Add other methods and helper functions
+    public void muteMicrophoneBeep() {
+        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
+        // Muting the system sound effects (this usually affects the mic beep sound)
+        audioManager.setStreamMute(AudioManager.STREAM_SYSTEM, true);
+    }
+
+    public void unmuteMicrophoneBeep() {
+        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+
+        // Unmuting the system sound effects
+        audioManager.setStreamMute(AudioManager.STREAM_SYSTEM, false);
+    }
+
+
+// Helper function to get random object
     private String getRandomNoun() {
         File[] nounFiles = imageFolder.listFiles(file -> file.getName().endsWith(".png") || file.getName().endsWith(".svg"));
         if (nounFiles != null && nounFiles.length > 0) {
@@ -374,6 +467,7 @@ public class Speech extends AppCompatActivity {
         }
         return null;
     }
+
 
     // Helper function to get random color
     private String getRandomAdjective() {
@@ -389,27 +483,7 @@ public class Speech extends AppCompatActivity {
     }
 
 
-    // New method to play sound for the object
-    private void playSoundForObject(String objectName) {
-        if (mediaPlayer != null) {
-            mediaPlayer.release();  // Release any previous media player
-        }
 
-        // Extract base object name by removing numbers (e.g., "cat1" becomes "cat")
-        String baseObjectName = objectName.replaceAll("\\d", "");
-
-        // First, try to find an audio file that matches the base object name (e.g., cat.mp3)
-        int soundResId = getResources().getIdentifier(baseObjectName.toLowerCase(), "raw", getPackageName());
-
-        // If no specific sound matches, play the common/default sound
-        if (soundResId == 0) {
-            soundResId = R.raw.common;  // Replace with your common sound resource ID
-        }
-
-        // Create a new MediaPlayer and start playing the sound
-        mediaPlayer = MediaPlayer.create(this, soundResId);
-        mediaPlayer.start();
-    }
 
     private List<File> getMatchingImagesForNoun(String noun) {
         // Use a FileFilter with a lambda expression to filter files
@@ -452,7 +526,6 @@ public class Speech extends AppCompatActivity {
         editor.apply();
     }
 
-    // Load the image and apply color and motion properties
     private void loadImageAndApplyProperties(String image, String color, String motion, Random rand) {
         File imageFilePNG = new File(imageFolder, image + ".png");
         File imageFileSVG = new File(imageFolder, image + ".svg");
@@ -465,33 +538,36 @@ public class Speech extends AppCompatActivity {
         }
 
         if (bitmap != null) {
-            // Apply color only to the object, skipping transparent pixels (background)
-            if (color != null && !color.isEmpty() && !adjectiveMap.containsKey(color) ) {
+            if (color != null && !color.isEmpty() && !adjectiveMap.containsKey(color)) {
                 int selectedColor = colorMap.get(color);
-                bitmap = applySelectiveColorToObject(bitmap, selectedColor);  // Apply color to object only
+                bitmap = applySelectiveColorToObject(bitmap, selectedColor);
             }
 
-            if(color != null && adjectiveMap.containsKey(color)) {
+            if (color != null && adjectiveMap.containsKey(color)) {
                 bitmap = handleAdjective(bitmap, color);
             }
 
             imageView.setImageBitmap(bitmap);
 
-            // Apply motion to the image
             if (motion != null && !motion.isEmpty()) {
-                applyMotion(motion, rand);
+                if (currentColor.equals("fast")) {
+                    applyMotion(motion, rand, 0.5);
+                } else if (currentColor.equals("slow")) {
+                    applyMotion(motion, rand, 2);
+                } else {
+                    applyMotion(motion, rand, 1);
+                }
             } else {
-                // Re-center image
                 imageView.setTranslationX(0);
                 imageView.setTranslationY(0);
+
+                handler.removeCallbacksAndMessages(null);
+                handler.postDelayed(() -> {
+                    imageView.setImageResource(0);
+                    resetImageViewScale();
+                }, 5000);
             }
-            handler.removeCallbacksAndMessages(null); // Clear currently processing handler callbacks
-            handler.postDelayed(() -> {
-                imageView.setImageResource(0);  // Clear image after 5 seconds
-                resetImageViewScale();  // Reset scaling after clearing the image
-            }, 5000);
         }
-        playSoundForObject(currentObject);
     }
 
     private void resetImageViewScale() {
@@ -516,64 +592,123 @@ public class Speech extends AppCompatActivity {
     }
 
     // Apply motion to the image based on the detected motion word
-    private void applyMotion(String motion, Random rand) {
+    private void applyMotion(String motion, Random rand, double speed) {
         ArrayList<RecordedMotion> selectedMotions = motionMap.get(motion);
         if (selectedMotions != null && !selectedMotions.isEmpty()) {
-            RecordedMotion selectedMotion = selectedMotions.size() > 0
+            RecordedMotion selectedMotion = (selectedMotions.size() > 0)
                     ? selectedMotions.get(rand.nextInt(selectedMotions.size()))
                     : selectedMotions.get(0);
 
-            moveImageBasedOnMotion(selectedMotion);
+            moveImageBasedOnMotion(selectedMotion, speed);
         }
     }
 
-    private void moveImageBasedOnMotion(RecordedMotion motion) {
-        List<List<Float>> posList = motion.posList;
-        List<Long> posIncrements = motion.posIncrements;
+    private void moveImageBasedOnMotion(RecordedMotion motion, double speed) {
+        // Get screen dimensions
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        int screenHeight = getResources().getDisplayMetrics().heightPixels;
+
+        // Reset image's rotation to default
         imageView.setRotation(0);
 
-        // Create a thread each for motion and rotation, so they can run concurrently
-        HandlerThread motionThread = new HandlerThread("MotionHandlerThread");
-        motionThread.start();
-        Handler motionHandler = new Handler(motionThread.getLooper());
-        motionHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (!posList.isEmpty()) {
-                    // Get and remove next position
-                    List<Float> pos = posList.remove(0);
-                    // Get and remove current position duration
-                    long currentIncrement = posIncrements.remove(0);
-                    // Set image's position to next position
-                    imageView.setX(pos.get(0) - imageView.getWidth() / 2);
-                    imageView.setY(pos.get(1) - imageView.getHeight() / 2);
-                    // Repeat until posList is empty
-                    motionHandler.postDelayed(this, currentIncrement);
-                } else {
-                    motionThread.quit();
+        // Ensure motion data exists and is valid
+        if (motion.posList == null || motion.posList.isEmpty() || motion.posIncrements == null || motion.posIncrements.isEmpty()) {
+            return;
+        }
+
+        // Remove previous callbacks and reset threads
+        motionHandler.removeCallbacksAndMessages(null);
+        rotationHandler.removeCallbacksAndMessages(null);
+
+        // Send runnables to motion handlers
+        motionHandler.post(() -> {
+            for (int i = 0; i < motion.posList.size(); i++) {
+                if (i >= motion.posIncrements.size()) return;  // Safety check
+
+                // Create final variables to be used inside the lambda expression
+                final List<Float> pos = motion.posList.get(i);
+                final long currentIncrement = motion.posIncrements.get(i);
+
+                // Calculate the next position
+                float targetX = pos.get(0) - imageView.getWidth() / 2;
+                float targetY = pos.get(1) - imageView.getHeight() / 2;
+
+                // Check if the target position exceeds the screen width or height
+                if (targetX < 0) targetX = 0;
+                if (targetY < 0) targetY = 0;
+                if (targetX + imageView.getWidth() > screenWidth) targetX = screenWidth - imageView.getWidth();
+                if (targetY + imageView.getHeight() > screenHeight) targetY = screenHeight - imageView.getHeight();
+
+                // Move the image to the calculated position on the UI thread
+                float finalTargetX = targetX;
+                float finalTargetY = targetY;
+                runOnUiThread(() -> {
+                    imageView.setX(finalTargetX);
+                    imageView.setY(finalTargetY);
+                });
+
+                // Sleep for the current increment
+                try {
+                    Thread.sleep(currentIncrement);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
                 }
             }
-        }, posIncrements.get(0));
 
-        long durationPerIncrement = motion.duration / 500;
-        float degreesPerIncrement = ((((float) motion.duration / 1000) * motion.rotationsPerSecond) / 500) * 360;
-        AtomicInteger rotationCount = new AtomicInteger(0);
+            // Clear the image after motion completes
+            runOnUiThread(() -> {
+                imageView.setImageResource(0);
+                resetImageViewScale();
+            });
+        });
 
-        HandlerThread rotationThread = new HandlerThread("RotationHandlerThread");
-        rotationThread.start();
-        Handler rotationHandler = new Handler(rotationThread.getLooper());
-        rotationHandler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                int count = rotationCount.getAndIncrement();
-                imageView.setRotation(count * degreesPerIncrement);
-                if (rotationCount.get() < 500) {
-                    motionHandler.postDelayed(this, durationPerIncrement);
-                } else {
-                    rotationThread.quit();
+        long durationPerIncrement = (long) ((motion.duration * speed) / 500);
+
+        // Handle rotation if motion has a custom rotation flag
+        if (motion.rotFlag) {
+            rotationHandler.post(() -> {
+                for (float angle : motion.angleList) {
+                    // Use final variable for rotation angle
+                    final float finalAngle = angle;
+                    runOnUiThread(() -> imageView.setRotation(finalAngle));
+                    try {
+                        Thread.sleep(durationPerIncrement);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
                 }
-            }
-        }, durationPerIncrement);
+
+                // Ensure image is cleared only after both motion and rotation are done
+                runOnUiThread(() -> {
+                    imageView.setImageResource(0);
+                    resetImageViewScale();
+                });
+            });
+        } else {
+            // Apply default rotation if no custom rotation
+            float degreesPerIncrement = ((((float) motion.duration / 1000) * motion.rotationsPerSecond) / 500) * 360;
+
+            rotationHandler.post(() -> {
+                for (int i = 0; i < 500; i++) {
+                    final int rotationIndex = i;  // Create a final copy of the loop variable
+                    runOnUiThread(() -> imageView.setRotation(rotationIndex * degreesPerIncrement));
+                    try {
+                        Thread.sleep(durationPerIncrement);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return;
+                    }
+                }
+
+                // Ensure image is cleared only after both motion and rotation are done
+                runOnUiThread(() -> {
+                    imageView.setImageResource(0);
+                    resetImageViewScale();
+                });
+            });
+        }
     }
 
     private Bitmap loadSVGAsBitmap(File svgFile) {
@@ -622,10 +757,6 @@ public class Speech extends AppCompatActivity {
         // Map to handle size adjectives
         adjectiveMap.put("big", "size");
         adjectiveMap.put("small", "size");
-        adjectiveMap.put("tiny","size");
-        adjectiveMap.put("little","size");
-        adjectiveMap.put("huge","size");
-        adjectiveMap.put("large","size");
 
         adjectiveMap.put("wide", "size");
         adjectiveMap.put("narrow", "size");
@@ -642,9 +773,13 @@ public class Speech extends AppCompatActivity {
         adjectiveMap.put("smooth", "texture");
 
         adjectiveMap.put("transparent", "opacity");
-        adjectiveMap.put("clear", "opacity");
+        adjectiveMap.put("opaque", "opacity");
 
         adjectiveMap.put("shiny","shiny");
+
+        // Map to handle speed adjectives
+        adjectiveMap.put("fast", "speed");
+        adjectiveMap.put("slow", "speed");
     }
 
 
@@ -670,25 +805,13 @@ public class Speech extends AppCompatActivity {
                     imageView.setScaleX(0.25f);
                     imageView.setScaleY(0.25f);
                 }
-                else if (adjective.equals("tiny") || adjective.equals("little")) {
-                    imageView.setScaleX(0.05f);
-                    imageView.setScaleY(0.05f);
-                }
-                else if (adjective.equals("huge")) {
-                    imageView.setScaleX(2.5f);
-                    imageView.setScaleY(2.5f);
-                }
-                else if (adjective.equals("large")) {
-                    imageView.setScaleX(2.5f);
-                    imageView.setScaleY(1.5f);
-                }
-                else if(adjective.equals("wide")) {
+            else if(adjective.equals("wide")) {
                     // Increase the horizontal scale of the ImageView to make it wider
                     imageView.setScaleX(2.0f);  // Make the image 1.5 times wider
                     imageView.setScaleY(0.5f);  // Keep the height the same
                 }
 
-                else if(adjective.equals("narrow")) {
+            else if(adjective.equals("narrow")) {
                     // Decrease the horizontal scale of the ImageView to make it narrower
                     imageView.setScaleX(0.5f);  // Make the image half as wide
                     imageView.setScaleY(2.0f);  // Keep the height the same
@@ -700,10 +823,10 @@ public class Speech extends AppCompatActivity {
                 // e.g., striped or dotted patterns
                 if (adjective.equals("stripped")) {
                     // Implement logic to overlay striped pattern on the image
-                    return overlayPatternOnImage("stripped", bitmap);
+                     return overlayPatternOnImage("stripped", bitmap);
                 } else if (adjective.equals("dotted")) {
                     // Implement logic to overlay dotted pattern on the image
-                    return overlayPatternOnImage("dotted", bitmap);
+                     return overlayPatternOnImage("dotted", bitmap);
                 }
                 break;
 
@@ -719,7 +842,7 @@ public class Speech extends AppCompatActivity {
             case "texture":
                 // Apply texture transformations here
                 if (adjective.equals("furry")) {
-                    return addTextureEffect("furry", bitmap);
+                   return addTextureEffect("furry", bitmap);
                 } else if (adjective.equals("smooth")) {
                     return addTextureEffect("smooth", bitmap);
                 }
@@ -727,9 +850,25 @@ public class Speech extends AppCompatActivity {
             case "opacity":  // Handle opacity changes
                 if (adjective.equals("transparent")) {
                     return changeImageOpacity(bitmap, 0.1f);  // 30% visible
-                } else if (adjective.equals("clear")) {
+                } else if (adjective.equals("opaque")) {
                     return changeImageOpacity(bitmap, 1.0f);  // Fully visible
                 }
+                break;
+
+            case "wide":
+                // Increase the horizontal scale of the ImageView to make it wider
+                imageView.setScaleX(1.5f);  // Make the image 1.5 times wider
+                imageView.setScaleY(1.0f);  // Keep the height the same
+                break;
+
+            case "narrow":
+                // Decrease the horizontal scale of the ImageView to make it narrower
+                imageView.setScaleX(0.5f);  // Make the image half as wide
+                imageView.setScaleY(1.0f);  // Keep the height the same
+                break;
+
+            case "speed":
+                // Do nothing
                 break;
         }
         return bitmap;
