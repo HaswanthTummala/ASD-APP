@@ -32,6 +32,7 @@
         android:layout_height="wrap_content"
         android:text="(leave blank for no/custom rotations)" />
 
+
     <EditText
         android:id="@+id/rotationInput"
         android:layout_width="wrap_content"
@@ -40,5 +41,14 @@
         android:ems="10"
         android:hint="e.g. &quot;0.5&quot;"
         android:inputType="text" />
+    <Button
+        android:id="@+id/uploadAudioButton"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Motion Audio"
+        android:enabled="true"
+        android:clickable="true"
+        android:layout_marginTop="16dp"
+        android:layout_gravity="center_horizontal" />
 
 </LinearLayout>

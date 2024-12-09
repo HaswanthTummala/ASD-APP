@@ -19,10 +19,7 @@
         android:id="@+id/nav_history"
         android:icon="@drawable/ic_history"
         android:title="History" />
-    <item
-        android:id="@+id/nav_demo"
-        android:icon="@drawable/ic_demo"
-        android:title="Demo" />
+
     <item
         android:id="@+id/nav_settings"
         android:icon="@drawable/ic_setting"

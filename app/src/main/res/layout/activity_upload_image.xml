@@ -34,6 +34,20 @@
 
             android:backgroundTint="?attr/colorPrimary"
             android:textColor="@android:color/white"/>
+        <!-- Spacer between buttons -->
+        <Space
+            android:layout_width="16dp"
+            android:layout_height="wrap_content" />
+        <!-- Edit Button -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/button_edit"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Edit"
+            android:enabled="false"
+            android:backgroundTint="?attr/colorPrimary"
+            android:textColor="@android:color/white"/>
 
         <!-- Spacer between buttons -->
         <Space

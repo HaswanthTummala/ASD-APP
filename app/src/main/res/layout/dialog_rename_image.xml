@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- EditText for entering the name for both image and audio -->
+    <EditText
+        android:id="@+id/editTextImageName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter name for image and audio(Ex: Dog)"
+        android:inputType="text" />
+    <EditText
+        android:id="@+id/editTextImageTags"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter tags separated by comma(Ex: animal,puppy)" />
+
+    <!-- Button to upload an audio file -->
+    <Button
+        android:id="@+id/buttonUploadAudio"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Upload Audio"
+        android:layout_marginTop="16dp" />
+
+</LinearLayout>

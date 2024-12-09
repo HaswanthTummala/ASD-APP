@@ -18,7 +18,7 @@ import androidx.drawerlayout.widget.DrawerLayout;
 
 import com.google.android.material.navigation.NavigationView;
 
-public class MainActivity extends AppCompatActivity implements NavigationView.OnNavigationItemSelectedListener {
+public class MainActivity extends AppCompatActivity  {
 
     // Variables
     private DrawerLayout drawerLayout;
@@ -33,17 +33,15 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
 
         /*---------------------Hooks------------------------*/
         drawerLayout = findViewById(R.id.drawer_layout);
-        navigationView = findViewById(R.id.nav_view);
-        toolbar = findViewById(R.id.toolbar);
+
+
         gridLayout = findViewById(R.id.gridLayout);  // Initialize GridLayout
 
         setSupportActionBar(toolbar);
-        navigationView.bringToFront();
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(this, drawerLayout, toolbar, R.string.navigation_drawer_open, R.string.navigation_drawer_close);
         drawerLayout.addDrawerListener(toggle);
         toggle.syncState();
-        navigationView.setNavigationItemSelectedListener(this);
-        navigationView.setCheckedItem(R.id.nav_home);
+
 
         // Set column count based on orientation
         if (getResources().getConfiguration().orientation == Configuration.ORIENTATION_LANDSCAPE) {
@@ -95,51 +93,6 @@ public class MainActivity extends AppCompatActivity implements NavigationView.On
         } else {
             super.onBackPressed();
         }
-    }
 
-    @SuppressLint("NonConstantResourceId")
-    @Override
-    public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
-        switch (menuItem.getItemId()) {
-            case R.id.nav_home:
-                // Handle Home navigation
-                break;
-
-            case R.id.nav_speech:
-                Intent intentSpeech = new Intent(MainActivity.this, Speech.class);
-                startActivity(intentSpeech);
-                break;
-            case R.id.nav_upload:
-                Intent intentUpload = new Intent(MainActivity.this, UploadImage.class);
-                startActivity(intentUpload);
-                break;
-            case R.id.nav_motion:
-                Intent intentMotion = new Intent(MainActivity.this, motion.class);
-                startActivity(intentMotion);
-                break;
-            case R.id.nav_history:
-                Intent intentHistory = new Intent(MainActivity.this, history.class);
-                startActivity(intentHistory);
-                break;
-            case R.id.nav_demo:
-                Intent intentDemo = new Intent(MainActivity.this, demo.class);
-                startActivity(intentDemo);
-                break;
-            case R.id.nav_settings:
-                Intent intentSetting = new Intent(MainActivity.this, settings.class);
-                startActivity(intentSetting);
-                break;
-            case R.id.nav_help:
-                Intent intentHelp = new Intent(MainActivity.this, help.class);
-                startActivity(intentHelp);
-                break;
-            default:
-                Toast.makeText(MainActivity.this, "Unknown menu item", Toast.LENGTH_SHORT).show();
-                break;
-        }
-
-        // Close the navigation drawer after selecting an item
-        drawerLayout.closeDrawer(GravityCompat.START);
-        return true;
     }
 }

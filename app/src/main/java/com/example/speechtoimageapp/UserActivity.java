@@ -10,12 +10,14 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.ArrayList;
+import java.util.Map;
 
 public class UserActivity extends AppCompatActivity {
 
-    private EditText userNameInput;
+    private EditText userNameInput, killWordInput;
     private UserRecyclerViewAdapter adapter;
     private ArrayList<String> userList;
+    private Map<String, String> userMap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -23,11 +25,13 @@ public class UserActivity extends AppCompatActivity {
         setContentView(R.layout.activity_user);
 
         userNameInput = findViewById(R.id.userNameInput);
+        killWordInput = findViewById(R.id.killWordInput);
         Button addUserButton = findViewById(R.id.addUserButton);
         RecyclerView userRecyclerView = findViewById(R.id.userRecyclerView);
 
         // Load existing users from SharedPreferences
-        userList = User.loadUserList(this);
+        userMap = User.loadUserMap(this);
+        userList = new ArrayList<>(userMap.keySet());
 
         // Set up RecyclerView
         adapter = new UserRecyclerViewAdapter(userList, this);
@@ -37,21 +41,23 @@ public class UserActivity extends AppCompatActivity {
         // Add User Button Click Listener
         addUserButton.setOnClickListener(v -> {
             String newUserName = userNameInput.getText().toString().trim();
-            if (!newUserName.isEmpty() && !userList.contains(newUserName)) {
-                // Add the new user to the list and save it in SharedPreferences
-                User.addUser(UserActivity.this, newUserName);
+            String newKillWord = killWordInput.getText().toString().trim();
+
+            if (!newUserName.isEmpty() && !newKillWord.isEmpty() && !userList.contains(newUserName)) {
+                User.addUser(UserActivity.this, newUserName, newKillWord);
                 userList.add(newUserName);
 
                 // Notify the adapter about the new item insertion
                 adapter.notifyItemInserted(userList.size() - 1);
 
-                // Clear the input field
+                // Clear the input fields
                 userNameInput.setText("");
+                killWordInput.setText("");
 
                 // Scroll to the newly added item
                 userRecyclerView.scrollToPosition(userList.size() - 1);
             } else {
-                Toast.makeText(UserActivity.this, "Please enter a unique name.", Toast.LENGTH_SHORT).show();
+                Toast.makeText(UserActivity.this, "Please enter a unique name and kill word.", Toast.LENGTH_SHORT).show();
             }
         });
     }

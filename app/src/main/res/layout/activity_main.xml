@@ -10,14 +10,6 @@
     tools:context=".MainActivity"
     tools:openDrawer="start">
 
-    <!-- Navigation View -->
-    <com.google.android.material.navigation.NavigationView
-        android:id="@+id/nav_view"
-        android:layout_gravity="start"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        app:headerLayout="@layout/header"
-        app:menu="@menu/main_menu" />
 
     <!-- Main Content - Scrollable Layout with Grid -->
     <ScrollView
@@ -31,19 +23,6 @@
             android:padding="16dp"
             android:background="#FFFFFF">
 
-            <!-- Toolbar at the Top -->
-            <androidx.appcompat.widget.Toolbar
-                android:id="@+id/toolbar"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:background="#00008577"
-                android:minHeight="?attr/actionBarSize"
-                android:theme="?attr/actionBarTheme"
-                app:layout_constraintEnd_toEndOf="parent"
-                app:layout_constraintStart_toStartOf="parent"
-                app:layout_constraintTop_toTopOf="parent"
-                app:navigationIcon="@drawable/ic_menu" />
 
             <!-- Grid Layout for Seven Items -->
             <GridLayout
@@ -58,7 +37,6 @@
                 android:layout_gravity="center"
                 android:padding="16dp"
                 android:gravity="center"
-                app:layout_constraintTop_toBottomOf="@id/toolbar"
                 app:layout_constraintBottom_toBottomOf="parent"
                 app:layout_constraintStart_toStartOf="parent"
                 app:layout_constraintEnd_toEndOf="parent">
